@@ -4,7 +4,7 @@
 The operator is an object that has meet the following signatures
 
     .filepathToContentHash(filepath) : Hash
-    .commitBlob(blob: BinaryData) : Hash
+    .putBlob(blob: BinaryData) : Hash
     .getBlobOrNull(nhash: Hash) : BinaryData
     .readBlobErrorIfNotFound(nhash: Hash) : BinaryData
     .datablobCheck(nhash: Hash): Boolean
@@ -19,7 +19,7 @@ class Elizabeth
         "SHA256-#{Digest::SHA256.file(filepath).hexdigest}"
     end
 
-    def commitBlob(blob)
+    def putBlob(blob)
         nhash = "SHA256-#{Digest::SHA256.hexdigest(blob)}"
         XCache::set(nhash, blob)
         nhash
@@ -125,7 +125,7 @@ class AionCore
         partSizeInBytes = 1024*1024 # 1 MegaBytes
         f = File.open(filepath)
         while ( blob = f.read(partSizeInBytes) ) do
-            hashes << operator.commitBlob(blob)
+            hashes << operator.putBlob(blob)
         end
         f.close()
         hashes
@@ -168,7 +168,7 @@ class AionCore
     def self.commitLocationReturnHash(operator, location)
         aionObject = AionCore::commitLocationReturnAionObject(operator, location)
         blob = JSON.generate(aionObject)
-        operator.commitBlob(blob)
+        operator.putBlob(blob)
     end
 
     # AionCore::exportAionObjectAtFolder(operator, aionObject, targetReconstructionFolderpath)
