@@ -108,4 +108,12 @@ class XCacheSets
         db.execute "delete from _set_ where _valueuuid_=?", [valueuuid]
         db.close
     end
+
+    # XCacheSets::empty(setuuid)
+    def self.empty(setuuid)
+        XCacheSets::ensureDatabase(setuuid)
+        db = SQLite3::Database.new(XCacheSets::databaseFileInXCache(setuuid))
+        db.execute "delete from _set_", []
+        db.close
+    end
 end
