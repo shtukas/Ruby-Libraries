@@ -22,61 +22,90 @@ require 'securerandom'
 
 require "/Users/pascal/Galaxy/LucilleOS/Libraries/Ruby-Libraries/XCache.rb"
 =begin
-    XCache::setFlagTrue(key)
-    XCache::setFlagFalse(key)
-    XCache::flagIsTrue(key)
-
-    XCache::set(value)
+    XCache::set(key, value)
     XCache::getOrNull(key)
     XCache::getOrDefaultValue(key, defaultValue)
     XCache::destroy(key)
+
+    XCache::setFlag(key, flag)
+    XCache::getFlag(key)
+
+    XCache::filepath(key)
 =end
 
 # ---------------------------------------------------------------------------------------------
 
 =begin
 
-The setuuid points at the root node located at "7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:#{root}"
+create table _set_ (_valueuuid_ text primary key, _value_ text);
 
-nodes are 
-{
-    "valueuuid" 
-    "value"     : value or null
-    "left"      : xcache id of left or null
-    "right"     : xcache id of right or null
-}
+We JSON encode the vsalues
 
 =end
 
 class XCacheSets
 
+    # XCacheSets::databaseFileInXCache(setuuid)
+    def self.databaseFileInXCache(setuuid)
+        XCache::filepath(setuuid)
+    end
+
+    # XCacheSets::ensureDatabase(setuuid)
+    def self.ensureDatabase(setuuid)
+        filepath = XCacheSets::databaseFileInXCache(setuuid)
+        return if File.exists?(filepath)
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute("create table _set_ (_valueuuid_ text primary key, _value_ text);")
+        db.close
+    end
+
     # XCacheSets::values(setuuid)
     def self.values(setuuid)
-        uuids = JSON.parse(XCache::getOrDefaultValue("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:uuids", "[]"))
-        uuids.map{|valueuuid| XCacheSets::getOrNull(setuuid, valueuuid) }.compact
+        XCacheSets::ensureDatabase(setuuid)
+        values = []
+        db = SQLite3::Database.new(XCacheSets::databaseFileInXCache(setuuid))
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute("select * from _set_", []) do |row|
+            values << JSON.parse(row['_value_'])
+        end
+        db.close
+        values
     end
 
     # XCacheSets::set(setuuid, valueuuid, value)
     def self.set(setuuid, valueuuid, value)
-        XCache::set("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:value:#{valueuuid}", JSON.generate([value]))
-        uuids = JSON.parse(XCache::getOrDefaultValue("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:uuids", "[]"))
-        if !uuids.include?(valueuuid) then
-            uuids << valueuuid
-            XCache::set("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:uuids", JSON.generate(uuids))
-        end
+        XCacheSets::ensureDatabase(setuuid)
+        db = SQLite3::Database.new(XCacheSets::databaseFileInXCache(setuuid))
+        db.execute "delete from _set_ where _valueuuid_=?", [valueuuid]
+        db.execute "insert into _set_ (_valueuuid_, _value_) values (?, ?)", [valueuuid, JSON.generate(value)]
+        db.close
     end
 
     # XCacheSets::getOrNull(setuuid, valueuuid)
     def self.getOrNull(setuuid, valueuuid)
-        packet = XCache::getOrNull("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:value:#{valueuuid}")
-        packet ? JSON.parse(packet)[0] : nil
+        XCacheSets::ensureDatabase(setuuid)
+        value = nil
+        db = SQLite3::Database.new(XCacheSets::databaseFileInXCache(setuuid))
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute("select * from _set_ where _valueuuid_=?", [valueuuid]) do |row|
+            value = JSON.parse(row['_value_'])
+        end
+        db.close
+        value
     end
 
     # XCacheSets::destroy(setuuid, valueuuid)
     def self.destroy(setuuid, valueuuid) 
-        uuids = JSON.parse(XCache::getOrDefaultValue("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:uuids", "[]"))
-        uuids.delete(valueuuid)
-        XCache::set("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:uuids", JSON.generate(uuids))
-        XCache::destroy("7b20d6d2-38c1-4cd7-89af-92b13907396d:#{setuuid}:value:#{valueuuid}")
+        XCacheSets::ensureDatabase(setuuid)
+        db = SQLite3::Database.new(XCacheSets::databaseFileInXCache(setuuid))
+        db.execute "delete from _set_ where _valueuuid_=?", [valueuuid]
+        db.close
     end
 end
