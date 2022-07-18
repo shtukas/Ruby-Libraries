@@ -20,7 +20,7 @@ require 'securerandom'
 # SecureRandom.hex(4) #=> "1ac4eb69"
 # SecureRandom.uuid   #=> "2d931510-d99f-494a-8c67-87feb05e1594"
 
-require "/Users/pascal/Galaxy/LucilleOS/Libraries/Ruby-Libraries/XCache.rb"
+require_relative "XCache.rb"
 =begin
     XCache::set(key, value)
     XCache::getOrNull(key)
@@ -39,7 +39,7 @@ require "/Users/pascal/Galaxy/LucilleOS/Libraries/Ruby-Libraries/XCache.rb"
 
 create table _set_ (_valueuuid_ text primary key, _value_ text);
 
-We JSON encode the vsalues
+We JSON encode the values
 
 =end
 

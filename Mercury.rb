@@ -7,7 +7,7 @@
     Mercury::isEmpty(channel)
 =end
 
-require "/Users/pascal/Galaxy/LucilleOS/Libraries/Ruby-Libraries/XCache.rb"
+require_relative "XCache.rb"
 =begin
     XCache::set(key, value)
     XCache::getOrNull(key)
