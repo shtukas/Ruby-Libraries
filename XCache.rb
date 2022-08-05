@@ -46,7 +46,7 @@ There is currently no prevention against the cache becoming arbitrarily big.
 
 =end
 
-XSPACE_XCACHE_V1_FOLDER_PATH = "/Users/pascal/x-space/xcache-v1-days"
+XSPACE_XCACHE_V1_FOLDER_PATH = "#{ENV['HOME']}/x-space/xcache-v1-days"
 
 class XCachePaths1
 
