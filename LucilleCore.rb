@@ -80,7 +80,7 @@ class LucilleCore
 
     # LucilleCore::isOnPower()
     def self.isOnPower()
-        `/Users/pascal/Galaxy/LucilleOS/Binaries/isOnPower`.strip == "true"
+        `#{ENV["HOME"]}/Galaxy/Binaries/isOnPower`.strip == "true"
     end
 
     # ------------------------------------------------------------------
