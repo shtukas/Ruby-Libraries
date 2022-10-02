@@ -185,6 +185,7 @@ class LucilleCore
     end
 
     # LucilleCore::indexsubfolderpath2(folderpath1, capacity = 100)
+    # In this version, we target the first folder under capacity
     def self.indexsubfolderpath2(folderpath1, capacity = 100)
         if !File.exists?(folderpath1) then
             FileUtils.mkpath(folderpath1)
