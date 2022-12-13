@@ -184,5 +184,5 @@ class XCache
     # XCache::filepath(key)
     def self.filepath(key)
         XCachePaths1::getFilepath(key)
-    end    
+    end
 end

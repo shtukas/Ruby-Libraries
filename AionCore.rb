@@ -49,7 +49,7 @@ end
 AionCore::commitLocationReturnHash(operator, location)
 AionCore::exportHashAtFolder(operator, nhash, targetReconstructionFolderpath)
 
-AionFsck::structureCheckAionHash(operator, nhash)
+AionFsck::structureCheckAionHashRaiseErrorIfAny(operator, nhash)
 
 =end
 
@@ -99,8 +99,8 @@ class AionCore
         '.DS_Store'
     end
 
-    # AionCore::getAionObjectByHash(operator, nhash)
-    def self.getAionObjectByHash(operator, nhash)
+    # AionCore::getAionObjectByHashRaiseErrorIfAny(operator, nhash)
+    def self.getAionObjectByHashRaiseErrorIfAny(operator, nhash)
         JSON.parse(operator.readBlobErrorIfNotFound(nhash))
     end
 
@@ -198,37 +198,32 @@ class AionCore
 
     # AionCore::exportHashAtFolder(operator, nhash, targetReconstructionFolderpath)
     def self.exportHashAtFolder(operator, nhash, targetReconstructionFolderpath)
-        aionObject = AionCore::getAionObjectByHash(operator, nhash)
+        aionObject = AionCore::getAionObjectByHashRaiseErrorIfAny(operator, nhash)
         AionCore::exportAionObjectAtFolder(operator, aionObject, targetReconstructionFolderpath)
     end
 end
 
 class AionFsck
 
-    # AionFsck::aionObjectCheck(operator, aionObject)
-    def self.aionObjectCheck(operator, aionObject)
+    # AionFsck::aionObjectCheckRaiseErrorIfAny(operator, aionObject)
+    def self.aionObjectCheckRaiseErrorIfAny(operator, aionObject)
         #puts "AionFsck: #{JSON.pretty_generate(aionObject)}"
         if aionObject["aionType"] == "file" then
             return aionObject["parts"].all?{|nhash| operator.datablobCheck(nhash) }
         end
         if aionObject["aionType"] == "directory" then
-            return aionObject["items"].all?{|namedAionHash| AionFsck::structureCheckAionHash(operator, namedAionHash) }
+            return aionObject["items"].all?{|namedAionHash| AionFsck::structureCheckAionHashRaiseErrorIfAny(operator, namedAionHash) }
         end
         if aionObject["aionType"] == "indefinite" then
             return true
         end
     end
 
-    # AionFsck::structureCheckAionHash(operator, nhash)
-    def self.structureCheckAionHash(operator, nhash)
+    # AionFsck::structureCheckAionHashRaiseErrorIfAny(operator, nhash)
+    def self.structureCheckAionHashRaiseErrorIfAny(operator, nhash)
         #puts "AionFsck: #{nhash}"
-        aionObject = nil
-        begin
-            aionObject = AionCore::getAionObjectByHash(operator, nhash)
-        rescue Exception => e
-            return false
-        end
-        AionFsck::aionObjectCheck(operator, aionObject)
+        aionObject = AionCore::getAionObjectByHashRaiseErrorIfAny(operator, nhash)
+        AionFsck::aionObjectCheckRaiseErrorIfAny(operator, aionObject)
     end
 end
 
