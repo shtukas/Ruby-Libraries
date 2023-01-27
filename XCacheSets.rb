@@ -53,7 +53,7 @@ class XCacheSets
     # XCacheSets::ensureDatabase(setuuid)
     def self.ensureDatabase(setuuid)
         filepath = XCacheSets::databaseFileInXCache(setuuid)
-        return if File.exists?(filepath)
+        return if File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }

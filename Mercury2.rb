@@ -29,7 +29,7 @@ class Mercury2
 
     # Mercury2::ensure_database(filepath)
     def self.ensure_database(filepath)
-        if !File.exists?(filepath) then
+        if !File.exist?(filepath) then
             db = SQLite3::Database.new(filepath)
             db.busy_timeout = 117
             db.busy_handler { |count| true }

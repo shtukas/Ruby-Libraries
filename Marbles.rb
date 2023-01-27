@@ -50,7 +50,7 @@ class Marbles
 
     # Marbles::issueNewEmptyMarbleFile(filepath)
     def self.issueNewEmptyMarbleFile(filepath)
-        raise "[5f930502-bb08-4971-8323-27c0c0031477: #{filepath}]" if File.exists?(filepath)
+        raise "[5f930502-bb08-4971-8323-27c0c0031477: #{filepath}]" if File.exist?(filepath)
 
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
@@ -63,7 +63,7 @@ class Marbles
     # Marbles::keys(filepath)
     def self.keys(filepath)
         # Some operations may accidentally call those functions on a marble that has died, that create an empty file
-        raise "ce1a703e-1104-44a6-b9ea-cc1c2f82bd8d" if !File.exists?(filepath)
+        raise "ce1a703e-1104-44a6-b9ea-cc1c2f82bd8d" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -81,7 +81,7 @@ class Marbles
     # Marbles::kvstore_set(filepath, key, value)
     def self.kvstore_set(filepath, key, value)
         # Some operations may accidentally call those functions on a marble that has died, that create an empty file
-        raise "08bf2e43-d8cf-4873-b8e2-82f5c1e7fa2a" if !File.exists?(filepath)
+        raise "08bf2e43-d8cf-4873-b8e2-82f5c1e7fa2a" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -95,7 +95,7 @@ class Marbles
     # Marbles::kvstore_getOrNull(filepath, key)
     def self.kvstore_getOrNull(filepath, key) # binary data or null
         # Some operations may accidentally call those functions on a marble that has died, that create an empty file
-        raise "ce1a703e-1104-44a6-b9ea-cc1c2f82bd8d" if !File.exists?(filepath)
+        raise "ce1a703e-1104-44a6-b9ea-cc1c2f82bd8d" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -118,7 +118,7 @@ class Marbles
     # Marbles::kvstore_destroy(filepath, key)
     def self.kvstore_destroy(filepath, key)
         # Some operations may accidentally call those functions on a marble that has died, that create an empty file
-        raise "80a79666-bc77-4347-a114-93a87738ced0" if !File.exists?(filepath)
+        raise "80a79666-bc77-4347-a114-93a87738ced0" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -132,25 +132,25 @@ class Marbles
 
     # Marbles::sets_add(filepath, setId, dataId, data)
     def self.sets_add(filepath, setId, dataId, data)
-        raise "87462e7a-80f0-4a4b-8723-4d66a71ba88b" if !File.exists?(filepath)
+        raise "87462e7a-80f0-4a4b-8723-4d66a71ba88b" if !File.exist?(filepath)
         Marbles::kvstore_set(filepath, "#{setId}:#{dataId}", data)
     end
 
     # Marbles::sets_remove(filepath, setId, dataId)
     def self.sets_remove(filepath, setId, dataId)
-        raise "934b097e-4cfc-40ba-b48d-93f5f04cf4f4" if !File.exists?(filepath)
+        raise "934b097e-4cfc-40ba-b48d-93f5f04cf4f4" if !File.exist?(filepath)
         Marbles::kvstore_destroy(filepath, "#{setId}:#{dataId}")
     end
 
     # Marbles::sets_getElementByIdOrNull(filepath, setId, dataId)
     def self.sets_getElementByIdOrNull(filepath, setId, dataId)
-        raise "8975c020-9645-4597-8e22-7d40572412b6: #{filepath}" if !File.exists?(filepath)
+        raise "8975c020-9645-4597-8e22-7d40572412b6: #{filepath}" if !File.exist?(filepath)
         Marbles::kvstore_getOrNull(filepath, "#{setId}:#{dataId}")
     end
 
     # Marbles::sets_getElements(filepath, setId)
     def self.sets_getElements(filepath, setId)
-        raise "d0281dea-0fd8-4ead-88cf-ea591950ecdc: #{filepath}" if !File.exists?(filepath)
+        raise "d0281dea-0fd8-4ead-88cf-ea591950ecdc: #{filepath}" if !File.exist?(filepath)
         Marbles::keys(filepath)
             .select{|key| key.start_with?("#{setId}:") }
             .map{|key| Marbles::kvstore_get(filepath, key) } # We could also use Marbles::kvstore_getOrNull
@@ -186,7 +186,7 @@ class Marbles
         filepath = "/tmp/#{SecureRandom.hex}"
         Marbles::issueNewEmptyMarbleFile(filepath)
 
-        raise "1d464a8d-d4ed-4d81-8e02-1ebeae50df30" if !File.exists?(filepath)
+        raise "1d464a8d-d4ed-4d81-8e02-1ebeae50df30" if !File.exist?(filepath)
 
         Marbles::kvstore_set(filepath, "key1", "value1")
 

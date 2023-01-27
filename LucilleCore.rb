@@ -111,7 +111,7 @@ class LucilleCore
 
     # LucilleCore::removeFileSystemLocation(location)
     def self.removeFileSystemLocation(location)
-        return if !File.exists?(location)
+        return if !File.exist?(location)
         if File.file?(location) then
             FileUtils.rm(location)
         else
@@ -131,7 +131,7 @@ class LucilleCore
 
     # LucilleCore::copyContents(sourceFolderpath, targetFolderpath)
     def self.copyContents(sourceFolderpath, targetFolderpath)
-        raise "[error: 2bb7c48e]" if !File.exists?(targetFolderpath)
+        raise "[error: 2bb7c48e]" if !File.exist?(targetFolderpath)
         LucilleCore::locationsAtFolder(sourceFolderpath).each{|location|
             LucilleCore::copyFileSystemLocation(location, targetFolderpath)
         }
@@ -139,7 +139,7 @@ class LucilleCore
 
     # LucilleCore::migrateContents(sourceFolderpath, targetFolderpath)
     def self.migrateContents(sourceFolderpath, targetFolderpath)
-        raise "[error: 2b67a91b]" if !File.exists?(targetFolderpath)
+        raise "[error: 2b67a91b]" if !File.exist?(targetFolderpath)
         LucilleCore::locationsAtFolder(sourceFolderpath).each{|location|
             LucilleCore::copyFileSystemLocation(location, targetFolderpath)
             LucilleCore::removeFileSystemLocation(location)
@@ -161,7 +161,7 @@ class LucilleCore
 
     # LucilleCore::indexsubfolderpath(folderpath1, capacity = 100)
     def self.indexsubfolderpath(folderpath1, capacity = 100)
-        if !File.exists?(folderpath1) then
+        if !File.exist?(folderpath1) then
             FileUtils.mkpath(folderpath1)
         end
         indexToLocation = lambda{|i, folderpath1| 
@@ -170,15 +170,15 @@ class LucilleCore
         indx = LucilleCore::integerEnumerator()
             .lazy
             .drop_while{|i|  
-                File.exists?(indexToLocation.call(i, folderpath1)) and File.exists?(indexToLocation.call(i+1, folderpath1))
+                File.exist?(indexToLocation.call(i, folderpath1)) and File.exist?(indexToLocation.call(i+1, folderpath1))
             }
             .drop_while{|i|  
                 folderpath = indexToLocation.call(i, folderpath1)
-                File.exists?(folderpath) and Dir.entries(folderpath).size >= capacity
+                File.exist?(folderpath) and Dir.entries(folderpath).size >= capacity
             }
             .first
         targetsubfolderpath = indexToLocation.call(indx, folderpath1)
-        if !File.exists?(targetsubfolderpath) then
+        if !File.exist?(targetsubfolderpath) then
             FileUtils.mkpath(targetsubfolderpath)
         end
         targetsubfolderpath
@@ -187,7 +187,7 @@ class LucilleCore
     # LucilleCore::indexsubfolderpath2(folderpath1, capacity = 100)
     # In this version, we target the first folder under capacity
     def self.indexsubfolderpath2(folderpath1, capacity = 100)
-        if !File.exists?(folderpath1) then
+        if !File.exist?(folderpath1) then
             FileUtils.mkpath(folderpath1)
         end
         indexToLocation = lambda{|i, folderpath1| 
@@ -197,11 +197,11 @@ class LucilleCore
             .lazy
             .drop_while{|i|  
                 folderpath = indexToLocation.call(i, folderpath1)
-                File.exists?(folderpath) and Dir.entries(folderpath).size >= capacity
+                File.exist?(folderpath) and Dir.entries(folderpath).size >= capacity
             }
             .first
         targetsubfolderpath = indexToLocation.call(indx, folderpath1)
-        if !File.exists?(targetsubfolderpath) then
+        if !File.exist?(targetsubfolderpath) then
             FileUtils.mkpath(targetsubfolderpath)
         end
         targetsubfolderpath

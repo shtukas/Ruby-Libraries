@@ -119,7 +119,7 @@ class AionCore
 
     # AionCore::commitFileReturnPartsHashs(operator, filepath)
     def self.commitFileReturnPartsHashs(operator, filepath)
-        raise "[AionCore error: 8338057a]" if !File.exists?(filepath)
+        raise "[AionCore error: 8338057a]" if !File.exist?(filepath)
         raise "[AionCore error: e216e1f3]" if !File.file?(filepath)
         hashes = []
         partSizeInBytes = 1024*1024 # 1 MegaBytes
@@ -144,7 +144,7 @@ class AionCore
 
     # AionCore::commitDirectoryReturnAionObject(operator, folderpath)
     def self.commitDirectoryReturnAionObject(operator, folderpath)
-        raise "[AionCore error: 8aa94546]" if !File.exists?(folderpath)
+        raise "[AionCore error: 8aa94546]" if !File.exist?(folderpath)
         raise "[AionCore error: ff9603a2]" if !File.directory?(folderpath)
         {
             "aionType" => "directory",
@@ -183,7 +183,7 @@ class AionCore
         end
         if aionObject["aionType"]=="directory" then
             targetSubFolderpath = "#{targetReconstructionFolderpath}/#{aionObject["name"]}"
-            if !File.exists?(targetSubFolderpath) then
+            if !File.exist?(targetSubFolderpath) then
                 FileUtils.mkpath(targetSubFolderpath)
             end
             aionObject["items"].each{|nhash|

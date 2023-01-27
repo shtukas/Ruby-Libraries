@@ -81,7 +81,7 @@ class XCachePaths1
         filename = "#{Digest::SHA1.hexdigest(key)}.data"
         folderpath = "#{datefolder}/#{filename[0,2]}"
         filepath = "#{folderpath}/#{filename}"
-        if !File.exists?(folderpath) then
+        if !File.exist?(folderpath) then
             FileUtils.mkpath(folderpath)
         end
         filepath
@@ -91,7 +91,7 @@ class XCachePaths1
     def self.getFilepath(key)
         filepaths = XCachePaths1::dates()
             .map{|date| XCachePaths1::filepathAtDate(key, date) }
-            .select{|filepath| File.exists?(filepath) }
+            .select{|filepath| File.exist?(filepath) }
 
         if filepaths.size == 0 then
             return XCachePaths1::filepathAtDate(key, XCachePaths1::today())
@@ -126,7 +126,7 @@ class XCachePaths1
     def self.getFilepathsForDeletion(key)
         XCachePaths1::dates()
             .map{|date| XCachePaths1::filepathAtDate(key, date) }
-            .select{|filepath| File.exists?(filepath) }
+            .select{|filepath| File.exist?(filepath) }
     end
 end
 
@@ -142,7 +142,7 @@ class XCache
     # XCache::getOrNull(key)
     def self.getOrNull(key)
         filepath, _ = XCachePaths1::getFilepathWithTmpLocation(key)
-        if File.exists?(filepath) then
+        if File.exist?(filepath) then
             return IO.read(filepath)
         end
         nil
@@ -162,7 +162,7 @@ class XCache
     def self.destroy(key)
         XCachePaths1::getFilepathsForDeletion(key)
             .each{|filepath|
-                if File.exists?(filepath) then
+                if File.exist?(filepath) then
                     FileUtils.rm(filepath)
                 end
             }
