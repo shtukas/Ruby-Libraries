@@ -66,7 +66,7 @@ class XCachePaths1
         # This came up when we were merging x-caches from various computers, 
         # we had more than 60 folders but all within 60 days, for instance, 2022-07-15 and 2022-07-15+A
         twoMonthsAgo = Time.at((Time.new.to_i - 86400*60)).to_s[0, 10]
-        while dates[0][0, 10] < twoMonthsAgo do
+        while !dates.empty? and dates[0][0, 10] < twoMonthsAgo do
             date = dates.shift
             datefolder = "#{XSPACE_XCACHE_V1_FOLDER_PATH}/#{date}"
             FileUtils.rm_rf(datefolder)
