@@ -1,5 +1,5 @@
 
-# require "/Users/pascal/Galaxy/Software/Libraries/Ruby-Libraries/SectionsType0141.rb"
+# require "/Users/pascal/Galaxy/Software/Lucille-Ruby-Libraries/SectionsType0141.rb"
 =begin
     # SectionsType0141::contentToSections(text)
     # SectionsType0141::applyNextTransformationToText(content)

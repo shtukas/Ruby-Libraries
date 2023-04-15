@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-# require "/Users/pascal/Galaxy/Software/Libraries/Ruby-Libraries/XCache.rb"
+# require "/Users/pascal/Galaxy/Software/Lucille-Ruby-Libraries/XCache.rb"
 =begin
     XCache::set(key, value)
     XCache::getOrNull(key)
