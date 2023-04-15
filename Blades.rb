@@ -1,9 +1,11 @@
 # encoding: utf-8
 
-
-
 =begin
 Blades
+
+    Blades::decideInitLocation(uuid)
+    Blades::locateBladeUsingUUID(uuid)
+
     Blades::init(uuid)
     Blades::setAttribute(uuid, attribute_name, value)
     Blades::getAttributeOrNull(uuid, attribute_name)
@@ -12,7 +14,6 @@ Blades
     Blades::putDatablob(uuid, key, datablob)
     Blades::getDatablobOrNull(uuid, key)
 =end
-
 
 require 'fileutils'
 # FileUtils.mkpath '/a/b/c'
@@ -62,15 +63,25 @@ reserved names:
 
 class Blades
 
-    # Blades::decide_init_location(uuid)
-    def self.decide_init_location(uuid)
+    # private
+
+    # Blades::filenameUsingFilenameOrUUID(token)
+    def self.filenameUsingFilenameOrUUID(token)
+        return token if File.exist?(token)
+
+    end
+
+    # public
+
+    # Blades::decideInitLocation(uuid)
+    def self.decideInitLocation(uuid)
         # This function returns the location of a new blade (either the original blade or a next one)
         # It should be re-implemented by the code that uses this library.
         raise "Blades::decide_init_location is not implemented"
     end
 
-    # Blades::locate_blade(uuid)
-    def self.locate_blade(uuid)
+    # Blades::locateBladeUsingUUID(uuid)
+    def self.locateBladeUsingUUID(uuid)
         # This function takes a blade uuid and returns its location or raise an error
         # It should be re-implemented by the code that uses this library.
         raise "Blades::locate_blade"
@@ -78,7 +89,7 @@ class Blades
 
     # Blades::init(uuid)
     def self.init(uuid)
-        filepath = Blades::decide_init_location(uuid)
+        filepath = Blades::decideInitLocation(uuid)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -88,9 +99,9 @@ class Blades
         Blades::setAttribute(uuid, "uuid", uuid)
     end
 
-    # Blades::setAttribute(uuid, attribute_name, value)
-    def self.setAttribute(uuid, attribute_name, value)
-        filepath = Blades::locate_blade(uuid)
+    # Blades::setAttribute(token, attribute_name, value)
+    def self.setAttribute(token, attribute_name, value)
+        filepath = Blades::filenameUsingFilenameOrUUID(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -99,10 +110,10 @@ class Blades
         db.close
     end
 
-    # Blades::getAttributeOrNull(uuid, attribute_name)
-    def self.getAttributeOrNull(uuid, attribute_name)
+    # Blades::getAttributeOrNull(token, attribute_name)
+    def self.getAttributeOrNull(token, attribute_name)
         value = nil
-        filepath = Blades::locate_blade(uuid)
+        filepath = Blades::filenameUsingFilenameOrUUID(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -115,28 +126,28 @@ class Blades
         value
     end
 
-    # Blades::addToSet(uuid, set_id, element_id, value)
-    def self.addToSet(uuid, set_id, element_id, value)
+    # Blades::addToSet(token, set_id, element_id, value)
+    def self.addToSet(token, set_id, element_id, value)
         
     end
 
-    # Blades::removeFromSet(uuid, set_id, element_id)
-    def self.removeFromSet(uuid, set_id, element_id)
+    # Blades::removeFromSet(token, set_id, element_id)
+    def self.removeFromSet(token, set_id, element_id)
         
     end
 
-    # Blades::getSet(uuid, set_id)
-    def self.getSet(uuid, set_id)
+    # Blades::getSet(token, set_id)
+    def self.getSet(token, set_id)
 
     end
 
-    # Blades::putDatablob(uuid, key, datablob)
-    def self.putDatablob(uuid, key, datablob)
+    # Blades::putDatablob(token, key, datablob)
+    def self.putDatablob(token, key, datablob)
 
     end
 
-    # Blades::getDatablobOrNull(uuid, key)
-    def self.getDatablobOrNull(uuid, key)
+    # Blades::getDatablobOrNull(token, key)
+    def self.getDatablobOrNull(token, key)
 
     end
 end
