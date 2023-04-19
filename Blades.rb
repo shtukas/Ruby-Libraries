@@ -65,10 +65,14 @@ class Blades
 
     # private
 
-    # Blades::filenameUsingFilenameOrUUID(token)
-    def self.filenameUsingFilenameOrUUID(token)
+    # Blades::filepathUsingFilepathOrUUID(token)
+    def self.filepathUsingFilepathOrUUID(token)
+
+        # We start by interpreting the token as a filepath
         return token if File.exist?(token)
 
+        # Then we interpret it as a uuid
+        Blades::locateBladeUsingUUID(token)
     end
 
     # public
@@ -101,7 +105,7 @@ class Blades
 
     # Blades::setAttribute(token, attribute_name, value)
     def self.setAttribute(token, attribute_name, value)
-        filepath = Blades::filenameUsingFilenameOrUUID(token)
+        filepath = Blades::filepathUsingFilepathOrUUID(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -113,7 +117,7 @@ class Blades
     # Blades::getAttributeOrNull(token, attribute_name)
     def self.getAttributeOrNull(token, attribute_name)
         value = nil
-        filepath = Blades::filenameUsingFilenameOrUUID(token)
+        filepath = Blades::filepathUsingFilepathOrUUID(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
