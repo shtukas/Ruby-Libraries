@@ -7,6 +7,15 @@
 
 =begin
 
+The main data type is MTx01: Map[uuid:String, filepath:String]
+This is just a map from uuids to the blade filepaths. That map is stored in XCache.
+
+We then have such a map per miku type. Given a miku type we maintain that map and store it in XCache.
+
+Calling for a mikuType will return the blades that are known and haven't moved since the last time
+the collection was indexed. If the client wants a proper enumeration of all teh blade, they should use
+
+
 =end
 
 require 'fileutils'
@@ -32,21 +41,16 @@ require 'find'
 
 require_relative "Blades.rb"
 
+require_relative "XCache.rb"
+
 # -----------------------------------------------------------------------------------
 
-class MikuTypes
+class MikuTypesCore
 
-    # MikuTypes::repositoryRoots()
-    def self.repositoryRoots()
-        # This function needs to be reimplemented by clients, it return an array 
-        # of file system locations where blades are looked for.
-        raise "MikuTypes::repositoryRoots is not implemented yet."
-    end
-
-    # MikuTypes::bladesEnumerator(roots = nil)
-    def self.bladesEnumerator(roots = nil)
+    # MikuTypesCore::bladesEnumerator(roots)
+    def self.bladesEnumerator(roots)
         # Enumerate the blade filepaths
-        roots = roots || MikuTypes::repositoryRoots()
+        roots = roots || MikuTypesCore::repositoryRoots()
         Enumerator.new do |filepaths|
             roots.each{|root|
                 if File.exist?(root) then
@@ -65,11 +69,11 @@ class MikuTypes
         end
     end
 
-    # MikuTypes::mikuTypedBlades(roots = nil)
-    def self.mikuTypedBlades(roots = nil)
+    # MikuTypesCore::mikuTypedBladesEnumerator(roots)
+    def self.mikuTypedBladesEnumerator(roots)
         # Enumerate the blade filepaths with a "mikuType" attribute
         Enumerator.new do |filepaths|
-            MikuTypes::bladesEnumerator(roots).each{|filepath|
+            MikuTypesCore::bladesEnumerator(roots).each{|filepath|
                 if !Blades::getAttributeOrNull(filepath, "mikuType").nil? then
                     filepaths << filepath
                 end
@@ -77,8 +81,20 @@ class MikuTypes
         end
     end
 
-    # MikuTypes::scan()
-    def self.scan()
+    # MikuTypesCore::mikuTypeEnumerator(roots, mikuType)
+    def self.mikuTypeEnumerator(roots, mikuType)
+        # Enumerate the blade filepaths with a "mikuType" attribute
+        Enumerator.new do |filepaths|
+            MikuTypesCore::mikuTypedBladesEnumerator(roots).each{|filepath|
+                if Blades::getAttributeOrNull(filepath, "mikuType") == mikuType then
+                    filepaths << filepath
+                end
+            }
+        end
+    end
+
+    # MikuTypesCore::scan(roots)
+    def self.scan(roots)
         # scans the file system in search of .blade files with a "mikuType" attribute
     end
 end
