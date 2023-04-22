@@ -1,7 +1,17 @@
 # encoding: utf-8
 
+=begin
+MikuTypes
+    MikuTypesCore::bladesEnumerator(roots)
+    MikuTypesCore::mikuTypedBladesEnumerator(roots)
+    MikuTypesCore::mikuTypeBladesEnumerator(roots, mikuType)
+    MikuTypesCore::scan(roots)
+    MikuTypesCore::scanMonitor(roots, periodInSeconds)
+    MikuTypesCore::mikuTypeFilepaths(mikuType)
+=end
+
 # MikuTypes is a blade management library.
-# It can be used to manage collections of blades with a "mikuType" attribute.
+# It can be used to manage collections of blades with a "mikuType" attribute. We also expect a "uuid" attribute.
 # Was introduced when we decided to commit to blades for Catalyst and Nyx.
 # It also handle reconciliations and mergings
 
@@ -13,8 +23,8 @@ This is just a map from uuids to the blade filepaths. That map is stored in XCac
 We then have such a map per miku type. Given a miku type we maintain that map and store it in XCache.
 
 Calling for a mikuType will return the blades that are known and haven't moved since the last time
-the collection was indexed. If the client wants a proper enumeration of all teh blade, they should use
-
+the collection was indexed. If the client wants a proper enumeration of all the blade, they should use
+the scanner.
 
 =end
 
@@ -40,6 +50,21 @@ require 'securerandom'
 require 'find'
 
 require_relative "Blades.rb"
+
+=begin
+Blades
+
+    Blades::decideInitLocation(uuid)
+    Blades::locateBladeUsingUUID(uuid)
+
+    Blades::init(uuid)
+    Blades::setAttribute(uuid, attribute_name, value)
+    Blades::getAttributeOrNull(uuid, attribute_name)
+    Blades::addToSet(uuid, set_id, element_id, value)
+    Blades::removeFromSet(uuid, set_id, element_id)
+    Blades::putDatablob(uuid, key, datablob)
+    Blades::getDatablobOrNull(uuid, key)
+=end
 
 require_relative "XCache.rb"
 
@@ -81,8 +106,8 @@ class MikuTypesCore
         end
     end
 
-    # MikuTypesCore::mikuTypeEnumerator(roots, mikuType)
-    def self.mikuTypeEnumerator(roots, mikuType)
+    # MikuTypesCore::mikuTypeBladesEnumerator(roots, mikuType)
+    def self.mikuTypeBladesEnumerator(roots, mikuType)
         # Enumerate the blade filepaths with a "mikuType" attribute
         Enumerator.new do |filepaths|
             MikuTypesCore::mikuTypedBladesEnumerator(roots).each{|filepath|
@@ -93,8 +118,67 @@ class MikuTypesCore
         end
     end
 
+    # MikuTypesCore::registerFilepath(filepath1)
+    def self.registerFilepath(filepath1)
+        mikuType = Blades::getAttributeOrNull(filepath1, "mikuType")
+        if mikuType.nil? then
+            raise "(error: 2032bbb5-aafa-4dba-b587-cdb461b098c9) filepath: #{filepath1} (this should not have happened because we are expecting a mikutyped blade)"
+        end
+
+        uuid = Blades::getAttributeOrNull(filepath1, "uuid")
+        if uuid.nil? then
+            raise "(error: 70bee4c7-9909-447a-90bf-fee13d690356) filepath: #{filepath1}, uuid: #{uuid} (this should not have happened)"
+        end
+
+        mtx01 = XCache::getOrNull("922805bf-bd46-41f0-855b-3b3a89dcf598:#{mikuType}")
+        if mtx01.nil? then
+            mtx01 = {}
+        else
+            mtx01 = JSON.parse(mtx01)
+        end
+
+        filepath0 = mtx01[uuid]
+
+        if filepath0 and File.exist?(filepath0) and filepath1 != filepath0 then
+            # We have two blades with the same uuid. We might want to merge them.
+            puts "We have two blades with the same uuid. We might want to merge them."
+            puts "filepath0: #{filepath0}"
+            puts "filepath1: #{filepath1}"
+            puts "MikuTypes doesn't yet know how to do that"
+            raise "method not implemented"
+        end
+
+        mtx01[uuid] = filepath1
+        XCache::set("922805bf-bd46-41f0-855b-3b3a89dcf598:#{mikuType}", JSON.generate(mtx01))
+    end
+
     # MikuTypesCore::scan(roots)
     def self.scan(roots)
-        # scans the file system in search of .blade files with a "mikuType" attribute
+        # scans the file system in search of .blade files and update the cache
+        MikuTypesCore::mikuTypedBladesEnumerator(roots).each{|filepath|
+            MikuTypesCore::registerFilepath(filepath)
+        }
+    end
+
+    # MikuTypesCore::scanMonitor(roots, periodInSeconds)
+    def self.scanMonitor(roots, periodInSeconds)
+        Thread.new {
+            sleep 10
+            loop {
+                MikuTypesCore::scan(roots)
+                sleep periodInSeconds
+            }
+        }
+    end
+
+    # MikuTypesCore::mikuTypeFilepaths(mikuType)
+    def self.mikuTypeFilepaths(mikuType)
+        mtx01 = XCache::getOrNull("922805bf-bd46-41f0-855b-3b3a89dcf598:#{mikuType}")
+        if mtx01.nil? then
+            mtx01 = {}
+        else
+            mtx01 = JSON.parse(mtx01)
+        end
+        mtx01.values
     end
 end
