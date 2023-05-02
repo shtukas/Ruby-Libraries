@@ -2,16 +2,15 @@
 
 =begin
 Blades
-    Blades::decideInitLocation(uuid)
-    Blades::locateBlade(token)
-
-    Blades::init(uuid)
-    Blades::setAttribute(uuid, attribute_name, value)
-    Blades::getAttributeOrNull(uuid, attribute_name)
-    Blades::addToSet(uuid, set_id, element_id, value)
-    Blades::removeFromSet(uuid, set_id, element_id)
-    Blades::putDatablob(uuid, key, datablob)
-    Blades::getDatablobOrNull(uuid, key)
+    Blades::init(mikuType, uuid)
+    Blades::tokenToFilepathOrNull(token)
+    Blades::setAttribute(token, attribute_name, value)
+    Blades::getAttributeOrNull(token, attribute_name)
+    Blades::getMandatoryAttribute(token, attribute_name)
+    Blades::addToSet(token, set_id, element_id, value)
+    Blades::removeFromSet(token, set_id, element_id)
+    Blades::putDatablob(token, key, datablob)
+    Blades::getDatablobOrNull(token, key)
 =end
 
 require 'fileutils'
@@ -64,27 +63,12 @@ reserved attributes:
 
 class Blades
 
-    # Blades::decideInitLocation(uuid)
-    def self.decideInitLocation(uuid)
-        "#{ENV["HOME"]}/Galaxy/DataHub/Blades/#{uuid}.blade"
-    end
+    # ----------------------------------------------
+    # Private
 
-    # Blades::init(uuid) # String : filepath
-    def self.init(uuid)
-        filepath = Blades::decideInitLocation(uuid)
-        db = SQLite3::Database.new(filepath)
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        db.execute("create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)", [])
-        db.close
-        Blades::setAttribute(uuid, "uuid", uuid)
-        filepath
-    end
-
-    # Blades::locateBlade(token) # filepath
+    # Blades::tokenToFilepathOrNull(token) # filepath or null
     # Token is either a uuid or a filepath
-    def self.locateBlade(token)
+    def self.tokenToFilepathOrNull(token)
         # We start by interpreting the token as a filepath
         return token if File.exist?(token)
         
@@ -99,7 +83,7 @@ class Blades
 
         # We have the uuid, let's try the uuid -> filepath mapping
         filepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
-        return filepath if File.exist?(filepath)
+        return filepath if (filepath and File.exist?(filepath))
 
         # We have the uuid, but got noting from the uuid -> filepath mapping
         # running exaustive search.
@@ -117,7 +101,7 @@ class Blades
                 db.busy_handler { |count| true }
                 db.results_as_hash = true
                 # We go through all the values, because the one we want is the last one
-                db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", attribute_name]) do |row|
+                db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", "uuid"]) do |row|
                     value = JSON.parse(row["_data_"])
                 end
                 db.close
@@ -136,20 +120,39 @@ class Blades
 
     # Blades::rename(filepath1)
     def self.rename(filepath1)
-        return if !File.exist?(filepath1)
+        return filepath1 if !File.exist?(filepath1)
         hash1 = Digest::SHA1.hexdigest(filepath1)
         dirname = File.dirname(filepath1)
         uuid = File.basename(filepath1).split("@").first
         filepath2 = "#{dirname}/#{uuid}@#{hash1}.blade"
-        return if filepath1 == filepath2
+        return filepath1 if filepath1 == filepath2
         FileUtils.mv(filepath1, filepath2)
         XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath2)
         MikuTypes::registerFilepath(filepath2)
+        filepath2
+    end
+
+    # ----------------------------------------------
+    # Public
+
+    # Blades::init(mikuType, uuid) # String : filepath
+    def self.init(mikuType, uuid)
+        filepath = Blades::decideInitLocation(uuid)
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute("create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)", [])
+        db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", "uuid", JSON.generate(uuid)]
+        db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", "mikuType", JSON.generate(mikuType)]
+        db.close
+        filepath = Blades::rename(filepath)
+        filepath
     end
 
     # Blades::setAttribute(token, attribute_name, value)
     def self.setAttribute(token, attribute_name, value)
-        filepath = Blades::locateBlade(token)
+        filepath = Blades::tokenToFilepathOrNull(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -162,7 +165,7 @@ class Blades
     # Blades::getAttributeOrNull(token, attribute_name)
     def self.getAttributeOrNull(token, attribute_name)
         value = nil
-        filepath = Blades::locateBlade(token)
+        filepath = Blades::tokenToFilepathOrNull(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -178,7 +181,7 @@ class Blades
     # Blades::getMandatoryAttribute(token, attribute_name)
     def self.getMandatoryAttribute(token, attribute_name)
         value = nil
-        filepath = Blades::locateBlade(token)
+        filepath = Blades::tokenToFilepathOrNull(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
