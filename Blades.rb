@@ -73,10 +73,10 @@ class Blades
         return token if File.exist?(token)
         
         uuid =
-            if token.include?(".blade") then
+            if token.include?("blade-") then
                 # filepath
                 return token if File.exist?(token)
-                File.basename(token).split("@").first
+                File.basename(token).gsub("blade-", "").split("@").first
             else
                 uuid = token
             end
@@ -85,8 +85,8 @@ class Blades
         filepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
         return filepath if (filepath and File.exist?(filepath))
 
-        # We have the uuid, but got noting from the uuid -> filepath mapping
-        # running exaustive search.
+        # We have the uuid, but got nothing from the uuid -> filepath mapping
+        # running exhaustive search.
 
         root = "#{ENV["HOME"]}/Galaxy/DataHub/Blades"
 
@@ -121,13 +121,12 @@ class Blades
     # Blades::rename(filepath1)
     def self.rename(filepath1)
         return filepath1 if !File.exist?(filepath1)
-        hash1 = Digest::SHA1.hexdigest(filepath1)
         dirname = File.dirname(filepath1)
-        uuid = File.basename(filepath1).split("@").first
-        filepath2 = "#{dirname}/#{uuid}@#{hash1}.blade"
+        uuid = Blades::getMandatoryAttribute(filepath1, "uuid")
+        hash1 = Digest::SHA1.hexdigest(filepath1)
+        filepath2 = "#{dirname}/blade-#{uuid}@#{hash1}"
         return filepath1 if filepath1 == filepath2
         FileUtils.mv(filepath1, filepath2)
-        XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath2)
         MikuTypes::registerFilepath(filepath2)
         filepath2
     end
