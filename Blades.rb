@@ -2,9 +2,8 @@
 
 =begin
 Blades
-
     Blades::decideInitLocation(uuid)
-    Blades::locateBladeUsingUUID(uuid)
+    Blades::locateBlade(token)
 
     Blades::init(uuid)
     Blades::setAttribute(uuid, attribute_name, value)
@@ -49,49 +48,28 @@ Each record is of the form
 Conventions:
     ----------------------------------------------------------------------------------
     | operation_name     | meaning of name                  | data conventions       |
+    ----------------------------------------------------------------------------------
     | "attribute"        | name of the attribute            | value is json encoded  |
     | "set-add"          | expression <set_name>/<value_id> | value is json encoded  |
     | "set-remove"       | expression <set_name>/<value_id> |                        |
     | "datablob"         | key (for instance a nhash)       | blob                   |
     ----------------------------------------------------------------------------------
 
-reserved names:
-    - uuid : unique identifier of the blade.
-    - next : (optional) uuid of the next blade in the sequence
+reserved attributes:
+    - uuid     : unique identifier of the blade.
+    - mikuType : String
+    - next     : (optional) uuid of the next blade in the sequence
 
 =end
 
 class Blades
 
-    # private
-
-    # Blades::filepathUsingFilepathOrUUID(token)
-    def self.filepathUsingFilepathOrUUID(token)
-
-        # We start by interpreting the token as a filepath
-        return token if File.exist?(token)
-
-        # Then we interpret it as a uuid
-        Blades::locateBladeUsingUUID(token)
-    end
-
-    # public
-
     # Blades::decideInitLocation(uuid)
     def self.decideInitLocation(uuid)
-        # This function returns the location of a new blade (either the original blade or a next one)
-        # It should be re-implemented by the code that uses this library.
-        raise "Blades::decide_init_location is not implemented"
+        "#{ENV["HOME"]}/Galaxy/DataHub/Blades/#{uuid}.blade"
     end
 
-    # Blades::locateBladeUsingUUID(uuid)
-    def self.locateBladeUsingUUID(uuid)
-        # This function takes a blade uuid and returns its location or raise an error
-        # It should be re-implemented by the code that uses this library.
-        raise "Blades::locate_blade"
-    end
-
-    # Blades::init(uuid)
+    # Blades::init(uuid) # String : filepath
     def self.init(uuid)
         filepath = Blades::decideInitLocation(uuid)
         db = SQLite3::Database.new(filepath)
@@ -101,23 +79,90 @@ class Blades
         db.execute("create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)", [])
         db.close
         Blades::setAttribute(uuid, "uuid", uuid)
+        filepath
+    end
+
+    # Blades::locateBlade(token) # filepath
+    # Token is either a uuid or a filepath
+    def self.locateBlade(token)
+        # We start by interpreting the token as a filepath
+        return token if File.exist?(token)
+        
+        uuid =
+            if token.include?(".blade") then
+                # filepath
+                return token if File.exist?(token)
+                File.basename(token).split("@").first
+            else
+                uuid = token
+            end
+
+        # We have the uuid, let's try the uuid -> filepath mapping
+        filepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
+        return filepath if File.exist?(filepath)
+
+        # We have the uuid, but got noting from the uuid -> filepath mapping
+        # running exaustive search.
+
+        root = "#{ENV["HOME"]}/Galaxy/DataHub/Blades"
+
+        Find.find(root) do |filepath|
+            next if !File.file?(filepath)
+            next if filepath[-6, 6] != ".blade"
+
+            readUUIDFromBlade = lambda {|filepath|
+                value = nil
+                db = SQLite3::Database.new(filepath)
+                db.busy_timeout = 117
+                db.busy_handler { |count| true }
+                db.results_as_hash = true
+                # We go through all the values, because the one we want is the last one
+                db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", attribute_name]) do |row|
+                    value = JSON.parse(row["_data_"])
+                end
+                db.close
+                raise "(error: 22749e93-77e0-4907-8226-f2e620d4a372)" if value.nil?
+                value
+            }
+
+            if readUUIDFromBlade.call(filepath) == uuid then
+                XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
+                return filepath
+            end
+        end
+
+        nil
+    end
+
+    # Blades::rename(filepath1)
+    def self.rename(filepath1)
+        return if !File.exist?(filepath1)
+        hash1 = Digest::SHA1.hexdigest(filepath1)
+        dirname = File.dirname(filepath1)
+        uuid = File.basename(filepath1).split("@").first
+        filepath2 = "#{dirname}/#{uuid}@#{hash1}.blade"
+        return if filepath1 == filepath2
+        FileUtils.mv(filepath1, filepath2)
+        XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath2)
+        MikuTypes::registerFilepath(filepath2)
     end
 
     # Blades::setAttribute(token, attribute_name, value)
     def self.setAttribute(token, attribute_name, value)
-        filepath = Blades::filepathUsingFilepathOrUUID(token)
+        filepath = Blades::locateBlade(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
         db.results_as_hash = true
         db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", attribute_name, JSON.generate(value)]
         db.close
+        Blades::rename(filepath)
     end
 
     # Blades::getAttributeOrNull(token, attribute_name)
     def self.getAttributeOrNull(token, attribute_name)
         value = nil
-        filepath = Blades::filepathUsingFilepathOrUUID(token)
+        filepath = Blades::locateBlade(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -130,14 +175,31 @@ class Blades
         value
     end
 
+    # Blades::getMandatoryAttribute(token, attribute_name)
+    def self.getMandatoryAttribute(token, attribute_name)
+        value = nil
+        filepath = Blades::locateBlade(token)
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        # We go through all the values, because the one we want is the last one
+        db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", attribute_name]) do |row|
+            value = JSON.parse(row["_data_"])
+        end
+        db.close
+        raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'" if value.nil?
+        value
+    end
+
     # Blades::addToSet(token, set_id, element_id, value)
     def self.addToSet(token, set_id, element_id, value)
-        
+
     end
 
     # Blades::removeFromSet(token, set_id, element_id)
     def self.removeFromSet(token, set_id, element_id)
-        
+
     end
 
     # Blades::getSet(token, set_id)

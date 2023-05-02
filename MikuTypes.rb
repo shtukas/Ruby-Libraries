@@ -2,12 +2,11 @@
 
 =begin
 MikuTypes
-    MikuTypesCore::bladesEnumerator(roots)
-    MikuTypesCore::mikuTypedBladesEnumerator(roots)
-    MikuTypesCore::mikuTypeBladesEnumerator(roots, mikuType)
-    MikuTypesCore::scan(roots)
-    MikuTypesCore::scanMonitor(roots, periodInSeconds)
-    MikuTypesCore::mikuTypeFilepaths(mikuType)
+    MikuTypes::bladesEnumerator()
+    MikuTypes::mikuTypedBladesEnumerator()
+    MikuTypes::mikuTypeEnumerator(mikuType)
+    MikuTypes::scan()
+    MikuTypes::mikuTypeFilepaths(mikuType)
 =end
 
 # MikuTypes is a blade management library.
@@ -53,9 +52,8 @@ require_relative "Blades.rb"
 
 =begin
 Blades
-
     Blades::decideInitLocation(uuid)
-    Blades::locateBladeUsingUUID(uuid)
+    Blades::locateBlade(token)
 
     Blades::init(uuid)
     Blades::setAttribute(uuid, attribute_name, value)
@@ -70,67 +68,41 @@ require_relative "XCache.rb"
 
 # -----------------------------------------------------------------------------------
 
-class MikuTypesCore
+class MikuTypes
 
-    # MikuTypesCore::bladesEnumerator(roots)
-    def self.bladesEnumerator(roots)
-        # Enumerate the blade filepaths
-        roots = roots || MikuTypesCore::repositoryRoots()
+    # MikuTypes::bladesEnumerator()
+    def self.bladesEnumerator()
+        root = "#{ENV["HOME"]}/Galaxy/DataHub/Blades"
         Enumerator.new do |filepaths|
-            roots.each{|root|
-                if File.exist?(root) then
-                    begin
-                        Find.find(root) do |path|
-                            next if !File.file?(path)
-                            filepath = path
-                            if filepath[-6, 6] == ".blade" then
-                                filepaths << path
-                            end
-                        end
-                    rescue
+           begin
+                Find.find(root) do |path|
+                    next if !File.file?(path)
+                    filepath = path
+                    if filepath[-6, 6] == ".blade" then
+                        filepaths << path
                     end
                 end
-            }
+            rescue
+            end
         end
     end
 
-    # MikuTypesCore::mikuTypedBladesEnumerator(roots)
-    def self.mikuTypedBladesEnumerator(roots)
-        # Enumerate the blade filepaths with a "mikuType" attribute
+    # MikuTypes::mikuTypeEnumerator(mikuType)
+    def self.mikuTypeEnumerator(mikuType)
         Enumerator.new do |filepaths|
-            MikuTypesCore::bladesEnumerator(roots).each{|filepath|
-                if !Blades::getAttributeOrNull(filepath, "mikuType").nil? then
+            MikuTypes::bladesEnumerator().each{|filepath|
+                if Blades::getMandatoryAttribute(filepath, "mikuType") == mikuType then
                     filepaths << filepath
                 end
             }
         end
     end
 
-    # MikuTypesCore::mikuTypeBladesEnumerator(roots, mikuType)
-    def self.mikuTypeBladesEnumerator(roots, mikuType)
-        # Enumerate the blade filepaths with a "mikuType" attribute
-        Enumerator.new do |filepaths|
-            MikuTypesCore::mikuTypedBladesEnumerator(roots).each{|filepath|
-                if Blades::getAttributeOrNull(filepath, "mikuType") == mikuType then
-                    filepaths << filepath
-                end
-            }
-        end
-    end
-
-    # MikuTypesCore::registerFilepath(filepath1)
+    # MikuTypes::registerFilepath(filepath1)
     def self.registerFilepath(filepath1)
-        mikuType = Blades::getAttributeOrNull(filepath1, "mikuType")
-        if mikuType.nil? then
-            raise "(error: 2032bbb5-aafa-4dba-b587-cdb461b098c9) filepath: #{filepath1} (this should not have happened because we are expecting a mikutyped blade)"
-        end
-
-        uuid = Blades::getAttributeOrNull(filepath1, "uuid")
-        if uuid.nil? then
-            raise "(error: 70bee4c7-9909-447a-90bf-fee13d690356) filepath: #{filepath1}, uuid: #{uuid} (this should not have happened)"
-        end
-
-        mtx01 = XCache::getOrNull("922805bf-bd46-41f0-855b-3b3a89dcf598:#{mikuType}")
+        mikuType = Blades::getMandatoryAttribute(filepath1, "mikuType")
+        uuid = Blades::getMandatoryAttribute(filepath1, "uuid")
+        mtx01 = XCache::getOrNull("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}")
         if mtx01.nil? then
             mtx01 = {}
         else
@@ -146,39 +118,54 @@ class MikuTypesCore
             puts "filepath1: #{filepath1}"
             puts "MikuTypes doesn't yet know how to do that"
             raise "method not implemented"
+            # We need to preserve filepath1 because that's the one we are going to register
         end
 
         mtx01[uuid] = filepath1
-        XCache::set("922805bf-bd46-41f0-855b-3b3a89dcf598:#{mikuType}", JSON.generate(mtx01))
+        XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath1)
+        XCache::set("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}", JSON.generate(mtx01))
     end
 
-    # MikuTypesCore::scan(roots)
-    def self.scan(roots)
-        # scans the file system in search of .blade files and update the cache
-        MikuTypesCore::mikuTypedBladesEnumerator(roots).each{|filepath|
-            MikuTypesCore::registerFilepath(filepath)
-        }
-    end
-
-    # MikuTypesCore::scanMonitor(roots, periodInSeconds)
-    def self.scanMonitor(roots, periodInSeconds)
-        Thread.new {
-            sleep 10
-            loop {
-                MikuTypesCore::scan(roots)
-                sleep periodInSeconds
-            }
-        }
-    end
-
-    # MikuTypesCore::mikuTypeFilepaths(mikuType)
-    def self.mikuTypeFilepaths(mikuType)
-        mtx01 = XCache::getOrNull("922805bf-bd46-41f0-855b-3b3a89dcf598:#{mikuType}")
+    # MikuTypes::unregisterFilepath(mikuType, filepath)
+    def self.unregisterFilepath(mikuType, filepath)
+        mtx01 = XCache::getOrNull("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}")
         if mtx01.nil? then
             mtx01 = {}
         else
             mtx01 = JSON.parse(mtx01)
         end
-        mtx01.values
+        mtx01 = mtx01.to_a.reject{|pair| pair[1] == filepath }.to_h
+        XCache::set("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}", JSON.generate(mtx01))
+    end
+
+    # MikuTypes::scan()
+    def self.scan()
+        # scans the file system in search of .blade files and update the cache
+        MikuTypes::bladesEnumerator().each{|filepath|
+            MikuTypes::registerFilepath(filepath)
+        }
+    end
+
+    # MikuTypes::mikuTypeFilepaths(mikuType) # Array[filepath]
+    def self.mikuTypeFilepaths(mikuType)
+        mtx01 = XCache::getOrNull("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}")
+        if mtx01.nil? then
+            mtx01 = {}
+        else
+            mtx01 = JSON.parse(mtx01)
+        end
+        mtx01
+            .values
+            .map{|filepath|
+                if File.exist?(filepath) then
+                    filepath
+                else
+                    # The file no longer exists at this location, we need to garbage collect it from the mtx01
+                    MikuTypes::unregisterFilepath(mikuType, filepath)
+                    nil
+                end
+            }
+            .compact
+            .sort
     end
 end
