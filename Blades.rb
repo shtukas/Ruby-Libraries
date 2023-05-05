@@ -67,6 +67,11 @@ class Blades
     # ----------------------------------------------
     # Private
 
+    # Blades::bladeRepository()
+    def self.bladeRepository()
+        "#{ENV["HOME"]}/Galaxy/DataHub/Blades"
+    end
+
     # Blades::isBlade(filepath) # boolean
     def self.isBlade(filepath)
         File.basename(filepath).start_with?("blade-")
@@ -97,9 +102,7 @@ class Blades
         # We have the uuid, but got nothing from the uuid -> filepath mapping
         # running exhaustive search.
 
-        root = "#{ENV["HOME"]}/Galaxy/DataHub/Blades"
-
-        Find.find(root) do |filepath|
+        Find.find(Blades::bladeRepository()) do |filepath|
             next if !File.file?(filepath)
             next if !Blades::isBlade(filepath)
 
@@ -129,12 +132,13 @@ class Blades
 
     # Blades::rename(filepath1)
     def self.rename(filepath1)
-        return filepath1 if !File.exist?(filepath1)
-        dirname = File.dirname(filepath1)
-        uuid = Blades::getMandatoryAttribute(filepath1, "uuid")
+        return if !File.exist?(filepath1)
         hash1 = Digest::SHA1.file(filepath1).hexdigest
-        filepath2 = "#{dirname}/blade-#{uuid}@#{hash1}"
-        return filepath1 if filepath1 == filepath2
+        filepath2 = "#{Blades::bladeRepository()}/#{hash1[0, 2]}/blade-#{hash1}"
+        return if filepath1 == filepath2
+        if !File.exist?(File.dirname(filepath2)) then
+            FileUtils.mkdir(File.dirname(filepath2))
+        end
         FileUtils.mv(filepath1, filepath2)
         MikuTypes::registerFilepath(filepath2)
         nil
@@ -148,7 +152,7 @@ class Blades
         if uuid.include?("@") then
             raise "A blade uuid cannot have the chracter: @ (use as separator in the blade filenames)"
         end
-        filepath = "#{ENV["HOME"]}/Galaxy/DataHub/Blades/blade-#{uuid}@#{SecureRandom.hex}"
+        filepath = "#{Blades::bladeRepository()}/blade-#{SecureRandom.hex}"
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }

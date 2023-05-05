@@ -115,10 +115,9 @@ class MikuTypes
 
     # MikuTypes::bladesFilepathsEnumerator()
     def self.bladesFilepathsEnumerator()
-        root = "#{ENV["HOME"]}/Galaxy/DataHub/Blades"
         Enumerator.new do |filepaths|
            begin
-                Find.find(root) do |path|
+                Find.find(Blades::bladeRepository()) do |path|
                     next if !File.file?(path)
                     if Blades::isBlade(path) then
                         filepaths << path
