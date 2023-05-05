@@ -137,7 +137,7 @@ class Blades
         return filepath1 if filepath1 == filepath2
         FileUtils.mv(filepath1, filepath2)
         MikuTypes::registerFilepath(filepath2)
-        filepath2
+        nil
     end
 
     # ----------------------------------------------
@@ -157,8 +157,8 @@ class Blades
         db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", "uuid", JSON.generate(uuid)]
         db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", "mikuType", JSON.generate(mikuType)]
         db.close
-        filepath = Blades::rename(filepath)
-        filepath
+        Blades::rename(filepath)
+        nil
     end
 
     # Blades::setAttribute(token, attribute_name, value)
@@ -171,6 +171,7 @@ class Blades
         db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", attribute_name, JSON.generate(value)]
         db.close
         Blades::rename(filepath)
+        nil
     end
 
     # Blades::getAttributeOrNull(token, attribute_name)
