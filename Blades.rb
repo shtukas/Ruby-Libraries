@@ -11,6 +11,7 @@ Blades
     Blades::removeFromSet(token, set_id, element_id)
     Blades::putDatablob(token, key, datablob)
     Blades::getDatablobOrNull(token, key)
+    Blades::destroy(token)
 =end
 
 require 'fileutils'
@@ -72,6 +73,9 @@ class Blades
         # We start by interpreting the token as a filepath
         return token if File.exist?(token)
         
+        # The token can then be either
+        #   - an outdated filepath
+        #   - a uuid
         uuid =
             if token.include?("blade-") then
                 # filepath
@@ -136,7 +140,10 @@ class Blades
 
     # Blades::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
-        filepath = Blades::decideInitLocation(uuid)
+        if uuid.include?("@") then
+            raise "A blade uuid cannot have the chracter: @ (use as separator in the blade filenames)"
+        end
+        filepath = "#{ENV["HOME"]}/Galaxy/DataHub/Blades/blade-#{SecureRandom.hex}"
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -217,5 +224,12 @@ class Blades
     # Blades::getDatablobOrNull(token, key)
     def self.getDatablobOrNull(token, key)
 
+    end
+
+    # Blades::destroy(token)
+    def self.destroy(token)
+        filepath = Blades::tokenToFilepathOrNull(token)
+        return if filepath.nil?
+        FileUtils.rm(filepath)
     end
 end
