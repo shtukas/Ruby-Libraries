@@ -89,10 +89,10 @@ class MikuTypes
             # We need to preserve filepath1 because that's the one we are going to register
         end
 
-        puts "registering:"
-        puts "    uuid     : #{uuid}"
-        puts "    filepath1: #{filepath1}"
-        puts "    mikuType : #{mikuType}"
+        #puts "registering:"
+        #puts "    uuid     : #{uuid}"
+        #puts "    filepath1: #{filepath1}"
+        #puts "    mikuType : #{mikuType}"
 
         mtx01[uuid] = filepath1
         XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath1)
@@ -144,7 +144,7 @@ class MikuTypes
     def self.scan()
         # scans the file system in search of blade-* files and update the cache
         MikuTypes::bladesFilepathsEnumerator().each{|filepath|
-            puts "scanning: #{filepath}"
+            #puts "scanning: #{filepath}"
             MikuTypes::registerFilepath(filepath)
         }
     end
