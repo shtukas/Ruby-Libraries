@@ -68,8 +68,8 @@ class MikuTypes
 
     # MikuTypes::registerFilepath(filepath1)
     def self.registerFilepath(filepath1)
-        mikuType = Blades::getMandatoryAttribute(filepath1, "mikuType")
         uuid = Blades::getMandatoryAttribute(filepath1, "uuid")
+        mikuType = Blades::getMandatoryAttribute(filepath1, "mikuType")
         mtx01 = XCache::getOrNull("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}")
         if mtx01.nil? then
             mtx01 = {}
@@ -88,6 +88,11 @@ class MikuTypes
             raise "method not implemented"
             # We need to preserve filepath1 because that's the one we are going to register
         end
+
+        puts "registering:"
+        puts "    uuid     : #{uuid}"
+        puts "    filepath1: #{filepath1}"
+        puts "    mikuType : #{mikuType}"
 
         mtx01[uuid] = filepath1
         XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath1)
@@ -115,8 +120,7 @@ class MikuTypes
            begin
                 Find.find(root) do |path|
                     next if !File.file?(path)
-                    filepath = path
-                    if filepath[-6, 6] == ".blade" then
+                    if Blades::isBlade(path) then
                         filepaths << path
                     end
                 end
@@ -138,8 +142,9 @@ class MikuTypes
 
     # MikuTypes::scan()
     def self.scan()
-        # scans the file system in search of .blade files and update the cache
+        # scans the file system in search of blade-* files and update the cache
         MikuTypes::bladesFilepathsEnumerator().each{|filepath|
+            puts "scanning: #{filepath}"
             MikuTypes::registerFilepath(filepath)
         }
     end

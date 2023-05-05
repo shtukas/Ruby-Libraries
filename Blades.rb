@@ -67,6 +67,11 @@ class Blades
     # ----------------------------------------------
     # Private
 
+    # Blades::isBlade(filepath) # boolean
+    def self.isBlade(filepath)
+        File.basename(filepath).start_with?("blade-")
+    end
+
     # Blades::tokenToFilepathOrNull(token) # filepath or null
     # Token is either a uuid or a filepath
     def self.tokenToFilepathOrNull(token)
@@ -96,7 +101,7 @@ class Blades
 
         Find.find(root) do |filepath|
             next if !File.file?(filepath)
-            next if filepath[-6, 6] != ".blade"
+            next if !Blades::isBlade(filepath)
 
             readUUIDFromBlade = lambda {|filepath|
                 value = nil
@@ -127,7 +132,7 @@ class Blades
         return filepath1 if !File.exist?(filepath1)
         dirname = File.dirname(filepath1)
         uuid = Blades::getMandatoryAttribute(filepath1, "uuid")
-        hash1 = Digest::SHA1.hexdigest(filepath1)
+        hash1 = Digest::SHA1.file(filepath1).hexdigest
         filepath2 = "#{dirname}/blade-#{uuid}@#{hash1}"
         return filepath1 if filepath1 == filepath2
         FileUtils.mv(filepath1, filepath2)
@@ -143,7 +148,7 @@ class Blades
         if uuid.include?("@") then
             raise "A blade uuid cannot have the chracter: @ (use as separator in the blade filenames)"
         end
-        filepath = "#{ENV["HOME"]}/Galaxy/DataHub/Blades/blade-#{SecureRandom.hex}"
+        filepath = "#{ENV["HOME"]}/Galaxy/DataHub/Blades/blade-#{uuid}@#{SecureRandom.hex}"
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
