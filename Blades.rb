@@ -3,15 +3,16 @@
 =begin
 Blades
     Blades::init(mikuType, uuid)
-    Blades::tokenToFilepathOrNull(token)
-    Blades::setAttribute(token, attribute_name, value)
-    Blades::getAttributeOrNull(token, attribute_name)
-    Blades::getMandatoryAttribute(token, attribute_name)
-    Blades::addToSet(token, set_id, element_id, value)
-    Blades::removeFromSet(token, set_id, element_id)
-    Blades::putDatablob(token, key, datablob)
-    Blades::getDatablobOrNull(token, key)
-    Blades::destroy(token)
+    Blades::uuidToFilepathOrNull(uuid)
+    Blades::setAttribute1(filepath, attribute_name, value)
+    Blades::setAttribute2(uuid, attribute_name, value)
+    Blades::getAttributeOrNull1(filepath, attribute_name)
+    Blades::getMandatoryAttribute1(filepath, attribute_name)
+    Blades::addToSet1(filepath, set_id, element_id, value)
+    Blades::removeFromSet1(filpath, set_id, element_id)
+    Blades::putDatablob1(filepath, key, datablob)
+    Blades::getDatablobOrNull1(filepath, key)
+    Blades::destroy(uuid)
 =end
 
 require 'fileutils'
@@ -77,54 +78,21 @@ class Blades
         File.basename(filepath).start_with?("blade-")
     end
 
-    # Blades::tokenToFilepathOrNull(token) # filepath or null
-    # Token is either a uuid or a filepath
-    def self.tokenToFilepathOrNull(token)
-        # We start by interpreting the token as a filepath
-        return token if File.exist?(token)
-        
-        # The token can then be either
-        #   - an outdated filepath
-        #   - a uuid
-        uuid =
-            if token.include?("blade-") then
-                # filepath
-                return token if File.exist?(token)
-                File.basename(token).gsub("blade-", "").split("@").first
-            else
-                uuid = token
-            end
-
-        # We have the uuid, let's try the uuid -> filepath mapping
+    # Blades::uuidToFilepathOrNull(uuid) # filepath or null
+    def self.uuidToFilepathOrNull(uuid)
+        # Let's try the uuid -> filepath mapping
         filepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
         return filepath if (filepath and File.exist?(filepath))
 
-        # We have the uuid, but got nothing from the uuid -> filepath mapping
-        # running exhaustive search.
+        # Got nothing from the uuid -> filepath mapping
+        # Running exhaustive search.
 
         Find.find(Blades::bladeRepository()) do |filepath|
             next if !File.file?(filepath)
             next if !Blades::isBlade(filepath)
-
-            readUUIDFromBlade = lambda {|filepath|
-                value = nil
-                db = SQLite3::Database.new(filepath)
-                db.busy_timeout = 117
-                db.busy_handler { |count| true }
-                db.results_as_hash = true
-                # We go through all the values, because the one we want is the last one
-                db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", "uuid"]) do |row|
-                    value = JSON.parse(row["_data_"])
-                end
-                db.close
-                raise "(error: 22749e93-77e0-4907-8226-f2e620d4a372)" if value.nil?
-                value
-            }
-
-            if readUUIDFromBlade.call(filepath) == uuid then
-                XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
-                return filepath
-            end
+            uuidx = Blades::getMandatoryAttribute1(filepath, "uuid")
+            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath)
+            return filepath if uuidx == uuid
         end
 
         nil
@@ -165,9 +133,9 @@ class Blades
         nil
     end
 
-    # Blades::setAttribute(token, attribute_name, value)
-    def self.setAttribute(token, attribute_name, value)
-        filepath = Blades::tokenToFilepathOrNull(token)
+    # Blades::setAttribute1(filepath, attribute_name, value)
+    def self.setAttribute1(filepath, attribute_name, value)
+        raise "(error: 042f0674-5b05-469c-adc1-db0012019e12) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -178,10 +146,17 @@ class Blades
         nil
     end
 
-    # Blades::getAttributeOrNull(token, attribute_name)
-    def self.getAttributeOrNull(token, attribute_name)
+    # Blades::setAttribute2(uuid, attribute_name, value)
+    def self.setAttribute2(uuid, attribute_name, value)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: cd0edf0c-c3d5-4743-852d-df9aae01632e) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
+        Blades::setAttribute1(filepath, attribute_name, value)
+    end
+
+    # Blades::getAttributeOrNull1(filepath, attribute_name)
+    def self.getAttributeOrNull1(filepath, attribute_name)
+        raise "(error: b1584ef9-20e9-4109-82d6-fef6d88e1265) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
         value = nil
-        filepath = Blades::tokenToFilepathOrNull(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -194,10 +169,24 @@ class Blades
         value
     end
 
-    # Blades::getMandatoryAttribute(token, attribute_name)
-    def self.getMandatoryAttribute(token, attribute_name)
+    # Blades::getMandatoryAttribute1(filepath, attribute_name)
+    def self.getMandatoryAttribute1(filepath, attribute_name)
+        value = Blades::getAttributeOrNull1(filepath, attribute_name)
+        raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'" if value.nil?
+        value
+    end
+
+    # Blades::getMandatoryAttribute2(uuid, attribute_name)
+    def self.getMandatoryAttribute2(uuid, attribute_name)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 5a075c65-edab-4a36-aafb-b8aad3f6422f) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
+        Blades::getMandatoryAttribute1(filepath, attribute_name)
+    end
+
+    # Blades::getMandatoryAttribute1(filepath, attribute_name)
+    def self.getMandatoryAttribute1(filepath, attribute_name)
+        raise "(error: 4a99e1f9-4896-49b1-b766-05c39d5a0fa0) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
         value = nil
-        filepath = Blades::tokenToFilepathOrNull(token)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -211,34 +200,34 @@ class Blades
         value
     end
 
-    # Blades::addToSet(token, set_id, element_id, value)
-    def self.addToSet(token, set_id, element_id, value)
+    # Blades::addToSet1(filepath, set_id, element_id, value)
+    def self.addToSet1(filepath, set_id, element_id, value)
 
     end
 
-    # Blades::removeFromSet(token, set_id, element_id)
-    def self.removeFromSet(token, set_id, element_id)
+    # Blades::removeFromSet1(filpath, set_id, element_id)
+    def self.removeFromSet1(filpath, set_id, element_id)
 
     end
 
-    # Blades::getSet(token, set_id)
-    def self.getSet(token, set_id)
+    # Blades::getSet1(filepath, set_id)
+    def self.getSet1(filepath, set_id)
 
     end
 
-    # Blades::putDatablob(token, key, datablob)
-    def self.putDatablob(token, key, datablob)
+    # Blades::putDatablob1(filepath, key, datablob)
+    def self.putDatablob1(filepath, key, datablob)
 
     end
 
-    # Blades::getDatablobOrNull(token, key)
-    def self.getDatablobOrNull(token, key)
+    # Blades::getDatablobOrNull1(filepath, key)
+    def self.getDatablobOrNull1(filepath, key)
 
     end
 
-    # Blades::destroy(token)
-    def self.destroy(token)
-        filepath = Blades::tokenToFilepathOrNull(token)
+    # Blades::destroy(uuid)
+    def self.destroy(uuid)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
         return if filepath.nil?
         FileUtils.rm(filepath)
     end

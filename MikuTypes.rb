@@ -51,9 +51,9 @@ require_relative "Blades.rb"
 =begin
 Blades
     Blades::init(mikuType, uuid)
-    Blades::setAttribute(uuid, attribute_name, value)
-    Blades::getAttributeOrNull(uuid, attribute_name)
-    Blades::getMandatoryAttribute(token, attribute_name)
+    Blades::setAttribute2(uuid, attribute_name, value)
+    Blades::getAttributeOrNull1(uuid, attribute_name)
+    Blades::getMandatoryAttribute1(filepath, attribute_name)
     Blades::addToSet(uuid, set_id, element_id, value)
     Blades::removeFromSet(uuid, set_id, element_id)
     Blades::putDatablob(uuid, key, datablob)
@@ -68,8 +68,8 @@ class MikuTypes
 
     # MikuTypes::registerFilepath(filepath1)
     def self.registerFilepath(filepath1)
-        uuid = Blades::getMandatoryAttribute(filepath1, "uuid")
-        mikuType = Blades::getMandatoryAttribute(filepath1, "mikuType")
+        uuid = Blades::getMandatoryAttribute1(filepath1, "uuid")
+        mikuType = Blades::getMandatoryAttribute1(filepath1, "mikuType")
         mtx01 = XCache::getOrNull("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}")
         if mtx01.nil? then
             mtx01 = {}
@@ -132,7 +132,7 @@ class MikuTypes
     def self.bladesFilepathEnumeratorForMikuType(mikuType)
         Enumerator.new do |filepaths|
             MikuTypes::bladesFilepathsEnumerator().each{|filepath|
-                if Blades::getMandatoryAttribute(filepath, "mikuType") == mikuType then
+                if Blades::getMandatoryAttribute1(filepath, "mikuType") == mikuType then
                     filepaths << filepath
                 end
             }
@@ -182,7 +182,7 @@ class MikuTypes
     def self.uuidEnumeratorForMikuTypeFromDisk(mikuType)
         Enumerator.new do |uuids|
            MikuTypes::bladesFilepathEnumeratorForMikuType(mikuType).each{|filepath|
-                uuids << Blades::getMandatoryAttribute(filepath, "uuid")
+                uuids << Blades::getMandatoryAttribute1(filepath, "uuid")
            }
         end
     end
