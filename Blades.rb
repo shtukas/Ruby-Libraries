@@ -135,6 +135,7 @@ class Blades
 
     # Blades::setAttribute1(filepath, attribute_name, value)
     def self.setAttribute1(filepath, attribute_name, value)
+        puts "Blades::setAttribute1(#{filepath}, #{attribute_name}, #{value})"
         raise "(error: 042f0674-5b05-469c-adc1-db0012019e12) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
