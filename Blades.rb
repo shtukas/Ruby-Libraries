@@ -47,7 +47,7 @@ create table records (record_uuid string primary key, operation_unixtime float, 
 
 Conventions:
     ----------------------------------------------------------------------------------
-    | operation_name     | meaning of name                  | data conventions       |
+    | operation_type     | meaning of _name_                | data conventions       |
     ----------------------------------------------------------------------------------
     | "attribute"        | name of the attribute            | value is json encoded  |
     | "set-add"          | expression <set_name>/<value_id> | value is json encoded  |
@@ -59,6 +59,9 @@ reserved attributes:
     - uuid     : unique identifier of the blade.
     - mikuType : String
     - next     : (optional) uuid of the next blade in the sequence
+    - previous : (optional) uuid of the previous blade in the sequence (mostly for blade garbage collection)
+
+NxPure is a MikuType reserved for datablob-only carrying blades (essentially `next` blades)
 
 =end
 
@@ -134,7 +137,7 @@ class Blades
 
     # Blades::setAttribute1(filepath, attribute_name, value)
     def self.setAttribute1(filepath, attribute_name, value)
-        puts "Blades::setAttribute1(#{filepath}, #{attribute_name}, #{value})"
+        puts "Blades::setAttribute1(filepath: #{filepath}, attribute_name: #{attribute_name}, value: #{value})".green
         raise "(error: 042f0674-5b05-469c-adc1-db0012019e12) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
@@ -148,6 +151,7 @@ class Blades
 
     # Blades::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
+        puts "Blades::setAttribute1(uuid: #{uuid}, attribute_name: #{attribute_name}, value: #{value})".green
         filepath = Blades::uuidToFilepathOrNull(uuid)
         raise "(error: cd0edf0c-c3d5-4743-852d-df9aae01632e) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
         Blades::setAttribute1(filepath, attribute_name, value)
@@ -215,14 +219,90 @@ class Blades
 
     end
 
-    # Blades::putDatablob1(filepath, key, datablob)
-    def self.putDatablob1(filepath, key, datablob)
+    # Blades::putDatablob1(filepath, datablob) # nhash
+    def self.putDatablob1(filepath, datablob)
+        raise "(error: 5d9d44cb-79af-4aa9-8e7b-d5639dcb4359) filepath: #{filepath}" if !File.exist?(filepath)
+        nhash = "SHA256-#{Digest::SHA256.hexdigest(datablob)}"
+        puts "Blades::putDatablob1(#{filepath}, nhash: #{nhash})".green
 
+        # Befoere putting a blob, we check the size of the file
+        if File.size(filepath) >= 1024*1024*100 then # 100 Mb
+            # The current file is too big
+            # Now the question is, is there a next ?
+            nextuuid = Blades::getAttributeOrNull1(filepath, "next")
+            if nextuuid then
+                return Blades::putDatablob2(nextuuid, datablob)
+            else
+                # There is no next
+                nextuuid = SecureRandom.uuid
+                puts "Making NEXT (#{nextuuid})".green
+                currentuuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+                Blades::init("NxPure", nextuuid)
+                Blades::setAttribute2(nextuuid, "previous", currentuuid)
+                Blades::setAttribute1(filepath, "next", nextuuid) # We mark `next` after we know the next blade is ready
+                return Blades::putDatablob2(nextuuid, datablob)
+            end
+        end
+
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "datablob", nhash, datablob]
+        db.close
+        Blades::rename(filepath)
+        nhash
     end
 
-    # Blades::getDatablobOrNull1(filepath, key)
-    def self.getDatablobOrNull1(filepath, key)
+    # Blades::putDatablob2(uuid, datablob)  # nhash
+    def self.putDatablob2(uuid, datablob)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 137dfd88-5ba1-4d2e-88ae-069b8d20b339) uuid: #{uuid}" if filepath.nil?
+        Blades::putDatablob1(filepath, datablob)
+    end
 
+    # Blades::getDatablobOrNull1(filepath, nhash)
+    def self.getDatablobOrNull1(filepath, nhash)
+        raise "(error: 273139ba-e4ef-4345-a4de-2594ce77c563) filepath: #{filepath}" if !File.exist?(filepath)
+        datablob = nil
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["datablob", nhash]) do |row|
+            datablob = row["_data_"]
+        end
+        db.close
+
+        if datablob.nil? then
+            # If we did not find a blob, it could be that the blob is at next.
+            # Let's try that!
+            nextuuid = Blades::getAttributeOrNull1(filepath, "next")
+            if nextuuid then
+                datablob = Blades::getDatablobOrNull2(nextuuid, nhash)
+                if datablob then
+                    return datablob # 🎉
+                end
+            end
+        end
+
+        if datablob.nil? then
+            datablob = N1Data::getBlobOrNull(nhash)
+            if datablob then
+                nhash2 = Blades::putDatablob1(filepath, datablob)
+                if nhash != nhash2 then
+                    raise "(error: 09e087e3-9edc-4ba0-a301-7399e6fb1bc8) filepath: #{filepath}, nhash: #{nhash}"
+                end
+            end
+        end
+        datablob
+    end
+
+    # Blades::getDatablobOrNull2(uuid, nhash)
+    def self.getDatablobOrNull2(uuid, nhash)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: bee6247e-c798-44a9-b72b-62773f75254e) uuid: #{uuid}" if filepath.nil?
+        Blades::getDatablobOrNull1(filepath, nhash)
     end
 
     # Blades::destroy(uuid)
@@ -230,5 +310,43 @@ class Blades
         filepath = Blades::uuidToFilepathOrNull(uuid)
         return if filepath.nil?
         FileUtils.rm(filepath)
+    end
+end
+
+class BladeElizabeth
+
+    def initialize(uuid)
+        @uuid = uuid
+    end
+
+    def putBlob(datablob) # nhash
+        Blades::putDatablob2(@uuid, datablob)
+    end
+
+    def filepathToContentHash(filepath)
+        "SHA256-#{Digest::SHA256.file(filepath).hexdigest}"
+    end
+
+    def getBlobOrNull(nhash)
+        Blades::getDatablobOrNull2(@uuid, nhash)
+    end
+
+    def readBlobErrorIfNotFound(nhash)
+        blob = getBlobOrNull(nhash)
+        return blob if blob
+        raise "(error: 6923aca5-2e83-4379-9d58-6c09c185d07c, nhash: #{nhash})"
+    end
+
+    def datablobCheck(nhash)
+        begin
+            blob = readBlobErrorIfNotFound(nhash)
+            status = ("SHA256-#{Digest::SHA256.hexdigest(blob)}" == nhash)
+            if !status then
+                puts "(error: 63374c58-b2f3-4e79-9844-2a110c57674d) incorrect blob, exists but doesn't have the right nhash: #{nhash}"
+            end
+            return status
+        rescue
+            false
+        end
     end
 end
