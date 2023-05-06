@@ -4,7 +4,7 @@
 MikuTypes
     MikuTypes::scan()
     MikuTypes::mikuTypeUUIDsCached(mikuType) # Cached
-    MikuTypes::uuidEnumeratorForMikuTypeFromDisk(mikuType)
+    MikuTypes::mikuTypeUUIDsEnumeratorFromDiskScan(mikuType)
 =end
 
 =begin
@@ -150,8 +150,8 @@ class MikuTypes
         end
     end
 
-    # MikuTypes::bladesFilepathEnumeratorForMikuType(mikuType)
-    def self.bladesFilepathEnumeratorForMikuType(mikuType)
+    # MikuTypes::mikuTypeToBladesFilepathsEnumerator(mikuType)
+    def self.mikuTypeToBladesFilepathsEnumerator(mikuType)
         Enumerator.new do |filepaths|
             MikuTypes::bladesFilepathsEnumerator().each{|filepath|
                 if Blades::getMandatoryAttribute1(filepath, "mikuType") == mikuType then
@@ -200,10 +200,10 @@ class MikuTypes
         mtx01.keys
     end
 
-    # MikuTypes::uuidEnumeratorForMikuTypeFromDisk(mikuType)
-    def self.uuidEnumeratorForMikuTypeFromDisk(mikuType)
+    # MikuTypes::mikuTypeUUIDsEnumeratorFromDiskScan(mikuType)
+    def self.mikuTypeUUIDsEnumeratorFromDiskScan(mikuType)
         Enumerator.new do |uuids|
-           MikuTypes::bladesFilepathEnumeratorForMikuType(mikuType).each{|filepath|
+           MikuTypes::mikuTypeToBladesFilepathsEnumerator(mikuType).each{|filepath|
                 uuids << Blades::getMandatoryAttribute1(filepath, "uuid")
            }
         end
