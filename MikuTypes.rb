@@ -68,6 +68,7 @@ class MikuTypes
 
     # MikuTypes::registerFilepath(filepath1)
     def self.registerFilepath(filepath1)
+        raise "(error: 2b647489-123c-48ba-a2e7-4e8e79da648e) filepath: #{filepath1}" if !File.exist?(filepath1)
         uuid = Blades::getMandatoryAttribute1(filepath1, "uuid")
         mikuType = Blades::getMandatoryAttribute1(filepath1, "mikuType")
         mtx01 = XCache::getOrNull("blades:mikutype->MTx01:mapping:42da489f9ef7:#{mikuType}")
@@ -79,14 +80,35 @@ class MikuTypes
 
         filepath0 = mtx01[uuid]
 
-        if filepath0 and File.exist?(filepath0) and filepath1 != filepath0 then
+        if filepath0 and (filepath0.class.to_s == "String") and File.exist?(filepath0) and filepath1 != filepath0 and (Blades::getMandatoryAttribute1(filepath0, "uuid") == uuid) then
             # We have two blades with the same uuid. We might want to merge them.
-            puts "We have two blades with the same uuid. We might want to merge them."
-            puts "filepath0: #{filepath0}"
-            puts "filepath1: #{filepath1}"
-            puts "MikuTypes doesn't yet know how to do that"
-            raise "method not implemented"
-            # We need to preserve filepath1 because that's the one we are going to register
+            puts "We have two blades with the same uuid:"
+            puts "    - #{filepath0}"
+            puts "    - #{filepath1}"
+            puts "Merging..."
+
+            db1 = SQLite3::Database.new(filepath1)
+            db0 = SQLite3::Database.new(filepath0)
+
+            # We move all the objects from db0 to db1
+
+            db0.busy_timeout = 117
+            db0.busy_handler { |count| true }
+            db0.results_as_hash = true
+            db0.execute("select * from records", []) do |row|
+                db1.execute "delete from records where record_uuid=?", [row["record_uuid"]]
+                db1.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [row["record_uuid"], row["operation_unixtime"], row["operation_type"], row["_name_"], row["_data_"]]
+            end
+
+            db0.close
+            db1.close
+
+            # We delete filepath0 and we rename/keep filepath1
+
+            FileUtils.rm(filepath0)
+            filepath1 = Blades::rename(filepath1)
+            puts "New file: #{filepath1}"
+
         end
 
         #puts "registering:"

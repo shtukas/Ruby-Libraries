@@ -43,8 +43,7 @@ require 'find'
 A blade is a log of events in a sqlite file.
 It offers a key/value store interface and a set interface.
 
-Each record is of the form
-    (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)
+create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)
 
 Conventions:
     ----------------------------------------------------------------------------------
@@ -98,18 +97,18 @@ class Blades
         nil
     end
 
-    # Blades::rename(filepath1)
+    # Blades::rename(filepath1) # new filepath
     def self.rename(filepath1)
-        return if !File.exist?(filepath1)
+        raise "(error: da2fb2ae-a50e-4359-b453-8bc4f856571a) filepath: #{filepath1}" if !File.exist?(filepath1)
         hash1 = Digest::SHA1.file(filepath1).hexdigest
         filepath2 = "#{Blades::bladeRepository()}/#{hash1[0, 2]}/blade-#{hash1}"
-        return if filepath1 == filepath2
+        return filepath1 if filepath1 == filepath2
         if !File.exist?(File.dirname(filepath2)) then
             FileUtils.mkdir(File.dirname(filepath2))
         end
         FileUtils.mv(filepath1, filepath2)
         MikuTypes::registerFilepath(filepath2)
-        nil
+        filepath2
     end
 
     # ----------------------------------------------
@@ -177,13 +176,6 @@ class Blades
         value
     end
 
-    # Blades::getMandatoryAttribute2(uuid, attribute_name)
-    def self.getMandatoryAttribute2(uuid, attribute_name)
-        filepath = Blades::uuidToFilepathOrNull(uuid)
-        raise "(error: 5a075c65-edab-4a36-aafb-b8aad3f6422f) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
-        Blades::getMandatoryAttribute1(filepath, attribute_name)
-    end
-
     # Blades::getMandatoryAttribute1(filepath, attribute_name)
     def self.getMandatoryAttribute1(filepath, attribute_name)
         raise "(error: 4a99e1f9-4896-49b1-b766-05c39d5a0fa0) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
@@ -199,6 +191,13 @@ class Blades
         db.close
         raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'" if value.nil?
         value
+    end
+
+    # Blades::getMandatoryAttribute2(uuid, attribute_name)
+    def self.getMandatoryAttribute2(uuid, attribute_name)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 5a075c65-edab-4a36-aafb-b8aad3f6422f) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
+        Blades::getMandatoryAttribute1(filepath, attribute_name)
     end
 
     # Blades::addToSet1(filepath, set_id, element_id, value)
