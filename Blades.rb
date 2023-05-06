@@ -8,8 +8,8 @@ Blades
     Blades::setAttribute2(uuid, attribute_name, value)
     Blades::getAttributeOrNull1(filepath, attribute_name)
     Blades::getMandatoryAttribute1(filepath, attribute_name)
-    Blades::addToSet1(filepath, set_id, element_id, value)
-    Blades::removeFromSet1(filpath, set_id, element_id)
+    Blades::addToSet1(filepath, set_name, value_id, value)
+    Blades::removeFromSet1(filpath, set_name, value_id)
     Blades::putDatablob1(filepath, key, datablob)
     Blades::getDatablobOrNull1(filepath, key)
     Blades::destroy(uuid)
@@ -47,7 +47,7 @@ create table records (record_uuid string primary key, operation_unixtime float, 
 
 Conventions:
     ----------------------------------------------------------------------------------
-    | operation_type     | meaning of _name_                | data conventions       |
+    | operation_type     | meaning of _name_                | _data_ conventions     |
     ----------------------------------------------------------------------------------
     | "attribute"        | name of the attribute            | value is json encoded  |
     | "set-add"          | expression <set_name>/<value_id> | value is json encoded  |
@@ -204,19 +204,81 @@ class Blades
         Blades::getMandatoryAttribute1(filepath, attribute_name)
     end
 
-    # Blades::addToSet1(filepath, set_id, element_id, value)
-    def self.addToSet1(filepath, set_id, element_id, value)
-
+    # Blades::addToSet1(filepath, set_name, value_id, value)
+    def self.addToSet1(filepath, set_name, value_id, value)
+        puts "Blades::addToSet1(filepath: #{filepath}, set_name: #{set_name}, value_id: #{value_id}, value: #{value})".green
+        raise "(error: ab5c468b-e672-4465-9881-6c26f987cbb0) filepath: #{filepath}, set_name: #{set_name}, value_id: #{value_id}, value: #{value}" if !File.exist?(filepath)
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "set-add", "#{set_name}/#{value_id}", JSON.generate(value)]
+        db.close
+        Blades::rename(filepath)
+        nil
     end
 
-    # Blades::removeFromSet1(filpath, set_id, element_id)
-    def self.removeFromSet1(filpath, set_id, element_id)
-
+    # Blades::addToSet2(uuid, set_name, value_id, value)
+    def self.addToSet2(uuid, set_name, value_id, value)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 85558d55-5d95-4df7-a8ab-143c260437d5) uuid: #{uuid}, set_name: #{set_name}, value_id: #{value_id}, value: #{value}" if filepath.nil?
+        Blades::addToSet1(filepath, set_name, value_id, value)
+        nil
     end
 
-    # Blades::getSet1(filepath, set_id)
-    def self.getSet1(filepath, set_id)
+    # Blades::removeFromSet1(filpath, set_name, value_id)
+    def self.removeFromSet1(filpath, set_name, value_id)
+        puts "Blades::removeFromSet1(filepath: #{filepath}, set_name: #{set_name}, value_id: #{value_id})".green
+        raise "(error: e4675f2a-5a04-4fc0-b80d-e13db981461d) filepath: #{filepath}, set_name: #{set_name}, value_id: #{value_id}" if !File.exist?(filepath)
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "set-remove", "#{set_name}/#{value_id}", nil]
+        db.close
+        Blades::rename(filepath)
+        nil
+    end
 
+    # Blades::removeFromSet2(uuid, set_name, value_id)
+    def self.removeFromSet2(uuid, set_name, value_id)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 2aebe5d0-342a-4f65-ba55-dde43b723553) uuid: #{uuid}, set_name: #{set_name}, value_id: #{value_id}" if filepath.nil?
+        Blades::removeFromSet1(filpath, set_name, value_id)
+        nil
+    end
+
+    # Blades::getSet1(filepath, set_name)
+    def self.getSet1(filepath, set_name)
+        raise "(error: 1f4a372e-cc6f-4d8f-9d9b-ebd3e1149b93) filepath: #{filepath}, set_name: #{set_name}" if !File.exist?(filepath)
+        hash_ = {} # Map[value_id, value]
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        # We go through all the values, because the one we want is the last one
+        db.execute("select * from records order by operation_unixtime", []) do |row|
+            if row["operation_type"][0, 4] == "set-" then
+                if row["_name_"].start_with?("#{set_name}/") then
+                    set_name, value_id = row["_name_"].split("/")
+                    if row["operation_type"] == "set-add" then
+                        hash_[value_id] = JSON.parse(row["_data_"]) # we set the value, possibly overriding any previous value at that value_id
+                    end
+                    if row["operation_type"] == "set-remove" then
+                        hash_.delete(value_id) # removing the value with the specified value_id.
+                    end
+                end
+            end
+        end
+        db.close
+        hash_.values
+    end
+
+    # Blades::getSet2(uuid, set_name)
+    def self.getSet2(uuid, set_name)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: d4f78bfc-4daa-430d-989d-60772d3309fa) uuid: #{uuid}, set_name: #{set_name}" if filepath.nil?
+        Blades::getSet1(filepath, set_name)
     end
 
     # Blades::putDatablob1(filepath, datablob) # nhash
@@ -286,15 +348,6 @@ class Blades
             end
         end
 
-        if datablob.nil? then
-            datablob = N1Data::getBlobOrNull(nhash)
-            if datablob then
-                nhash2 = Blades::putDatablob1(filepath, datablob)
-                if nhash != nhash2 then
-                    raise "(error: 09e087e3-9edc-4ba0-a301-7399e6fb1bc8) filepath: #{filepath}, nhash: #{nhash}"
-                end
-            end
-        end
         datablob
     end
 
