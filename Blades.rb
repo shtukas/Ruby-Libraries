@@ -114,6 +114,8 @@ class Blades
         puts "    old: #{filepath1}".green
         puts "    new: #{filepath2}".green
         FileUtils.mv(filepath1, filepath2)
+        uuidx = Blades::getMandatoryAttribute1(filepath2, "uuid")
+        XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath2)
         filepath2
     end
 
