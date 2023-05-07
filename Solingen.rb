@@ -41,15 +41,14 @@ class Solingen
 
     # Solingen::getLBXOrNull(uuid)
     def self.getLBXOrNull(uuid)
-        $LBXs.select{|lbx| lbx[uuid]}.first.clone
+        $LBXs.select{|lbx| lbx["uuid"] == uuid }.first.clone
     end
 
     # Solingen::replaceLBX(lbx)
     def self.replaceLBX(lbx)
         raise "(error: b8a21fc4-b939-4604-93ba-e979f73d271c) no uuid found in lbx: #{lbx}" if lbx["uuid"].nil?
         raise "(error: b8a21fc4-b939-4604-93ba-e979f73d271c) no uuid found in lbx: #{lbx}" if lbx["mikuType"].nil?
-        liveblades = $LBXs.reject{|i| i["uuid"] == lbx["uuid"] }
-        $LBXs = liveblades + [lbx.clone]
+        $LBXs = $LBXs.reject{|i| i["uuid"] == lbx["uuid"] } + [lbx.clone]
     end
 
     # Solingen::bladesFilepathsEnumerator()
