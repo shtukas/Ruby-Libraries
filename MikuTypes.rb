@@ -161,11 +161,11 @@ class MikuTypes
         end
     end
 
-    # MikuTypes::scan()
-    def self.scan()
+    # MikuTypes::scan(verbose = false)
+    def self.scan(verbose = false)
         # scans the file system in search of blade-* files and update the cache
         MikuTypes::bladesFilepathsEnumerator().each{|filepath|
-            #puts "scanning: #{filepath}"
+            puts "scanning: #{filepath}" if verbose
             MikuTypes::registerFilepath(filepath)
         }
     end

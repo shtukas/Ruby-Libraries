@@ -173,28 +173,27 @@ class Blades
         value
     end
 
-    # Blades::getMandatoryAttribute1(filepath, attribute_name)
-    def self.getMandatoryAttribute1(filepath, attribute_name)
-        value = Blades::getAttributeOrNull1(filepath, attribute_name)
-        raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'" if value.nil?
-        value
+    # Blades::getAttributeOrNull2(uuid, attribute_name)
+    def self.getAttributeOrNull2(uuid, attribute_name)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 0cda7fb0-9392-4f03-a34d-dd45fec1af2f) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
+        Blades::getAttributeOrNull1(filepath, attribute_name)
     end
 
     # Blades::getMandatoryAttribute1(filepath, attribute_name)
     def self.getMandatoryAttribute1(filepath, attribute_name)
-        raise "(error: 4a99e1f9-4896-49b1-b766-05c39d5a0fa0) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
-        value = nil
-        db = SQLite3::Database.new(filepath)
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        # We go through all the values, because the one we want is the last one
-        db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", attribute_name]) do |row|
-            value = JSON.parse(row["_data_"])
+        value = Blades::getAttributeOrNull1(filepath, attribute_name)
+        if value.nil? then
+            raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'"
         end
-        db.close
-        raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'" if value.nil?
         value
+    end
+
+    # Blades::getMandatoryAttribute2(uuid, attribute_name)
+    def self.getMandatoryAttribute2(uuid, attribute_name)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 4a99e1f9-4896-49b1-b766-05c39d5a0fa0) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
+        Blades::getMandatoryAttribute1(filepath, attribute_name)
     end
 
     # Blades::getMandatoryAttribute2(uuid, attribute_name)
