@@ -48,7 +48,7 @@ class Solingen
     def self.replaceLBX(lbx)
         raise "(error: b8a21fc4-b939-4604-93ba-e979f73d271c) no uuid found in lbx: #{lbx}" if lbx["uuid"].nil?
         raise "(error: b8a21fc4-b939-4604-93ba-e979f73d271c) no uuid found in lbx: #{lbx}" if lbx["mikuType"].nil?
-        liveblades = $LBXs.reject{|i| i["uuid"] == lbx["uuid"][0] }
+        liveblades = $LBXs.reject{|i| i["uuid"] == lbx["uuid"] }
         $LBXs = liveblades + [lbx.clone]
     end
 
