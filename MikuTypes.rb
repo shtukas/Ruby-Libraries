@@ -80,7 +80,7 @@ class MikuTypes
 
         filepath0 = mtx01[uuid]
 
-        if filepath0 and (filepath0.class.to_s == "String") and File.exist?(filepath0) and filepath1 != filepath0 and (Blades::getMandatoryAttribute1(filepath0, "uuid") == uuid) then
+        if filepath0 and File.exist?(filepath0) and filepath1 != filepath0 and (Blades::getMandatoryAttribute1(filepath0, "uuid") == uuid) then
             # We have two blades with the same uuid. We might want to merge them.
             puts "We have two blades with the same uuid:"
             puts "    - #{filepath0}"
