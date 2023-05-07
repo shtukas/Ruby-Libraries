@@ -118,7 +118,7 @@ class Solingen
     def self.getMandatoryAttribute2(uuid, attribute_name)
         value = Solingen::getAttributeOrNull2(uuid, attribute_name)
         if value.nil? then
-            raise "(error: 1052d5d1-6c5b-4b58-b470-22de8b68f4c8) Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'"
+            raise "(error: 1052d5d1-6c5b-4b58-b470-22de8b68f4c8) Failing mandatory attribute '#{attribute_name}' at blade uuid: '#{uuid}'"
         end
         value
     end
