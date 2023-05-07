@@ -8,6 +8,7 @@ Blades
     Blades::setAttribute2(uuid, attribute_name, value)
     Blades::getAttributeOrNull1(filepath, attribute_name)
     Blades::getMandatoryAttribute1(filepath, attribute_name)
+    Blades::getMandatoryAttribute2(uuid, attribute_name)
     Blades::addToSet1(filepath, set_name, value_id, value)
     Blades::removeFromSet1(filpath, set_name, value_id)
     Blades::putDatablob1(filepath, key, datablob)
@@ -113,7 +114,6 @@ class Blades
         puts "    old: #{filepath1}".green
         puts "    new: #{filepath2}".green
         FileUtils.mv(filepath1, filepath2)
-        MikuTypes::registerFilepath(filepath2)
         filepath2
     end
 
@@ -187,7 +187,7 @@ class Blades
     def self.getMandatoryAttribute1(filepath, attribute_name)
         value = Blades::getAttributeOrNull1(filepath, attribute_name)
         if value.nil? then
-            raise "Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'"
+            raise "(error: f6d8c9d9-84cb-4f14-95c2-402d2471ef93) Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'"
         end
         value
     end
@@ -196,13 +196,6 @@ class Blades
     def self.getMandatoryAttribute2(uuid, attribute_name)
         filepath = Blades::uuidToFilepathOrNull(uuid)
         raise "(error: 4a99e1f9-4896-49b1-b766-05c39d5a0fa0) filepath: #{filepath}, attribute_name, #{attribute_name}" if !File.exist?(filepath)
-        Blades::getMandatoryAttribute1(filepath, attribute_name)
-    end
-
-    # Blades::getMandatoryAttribute2(uuid, attribute_name)
-    def self.getMandatoryAttribute2(uuid, attribute_name)
-        filepath = Blades::uuidToFilepathOrNull(uuid)
-        raise "(error: 5a075c65-edab-4a36-aafb-b8aad3f6422f) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
         Blades::getMandatoryAttribute1(filepath, attribute_name)
     end
 
