@@ -109,9 +109,9 @@ class Blades
         if !File.exist?(File.dirname(filepath2)) then
             FileUtils.mkdir(File.dirname(filepath2))
         end
-        puts "renaming:"
-        puts "    old: #{filepath1}"
-        puts "    new: #{filepath2}"
+        puts "renaming:".green
+        puts "    old: #{filepath1}".green
+        puts "    new: #{filepath2}".green
         FileUtils.mv(filepath1, filepath2)
         MikuTypes::registerFilepath(filepath2)
         filepath2

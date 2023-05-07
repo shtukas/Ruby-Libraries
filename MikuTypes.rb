@@ -154,6 +154,12 @@ class MikuTypes
     def self.mikuTypeToBladesFilepathsEnumerator(mikuType)
         Enumerator.new do |filepaths|
             MikuTypes::bladesFilepathsEnumerator().each{|filepath|
+                if File.size(filepath) == 0 then
+                    puts "> empty blade: #{filepath}, going to delete the file"
+                    LucilleCore::pressEnterToContinue()
+                    FileUtils.rm(filepath)
+                    next
+                end
                 if Blades::getMandatoryAttribute1(filepath, "mikuType") == mikuType then
                     filepaths << filepath
                 end
