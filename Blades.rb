@@ -156,7 +156,7 @@ class Blades
 
     # Blades::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
-        puts "Blades::setAttribute1(uuid: #{uuid}, attribute_name: #{attribute_name}, value: #{value})".green
+        puts "Blades::setAttribute2(uuid: #{uuid}, attribute_name: #{attribute_name}, value: #{value})".green
         filepath = Blades::uuidToFilepathOrNull(uuid)
         raise "(error: cd0edf0c-c3d5-4743-852d-df9aae01632e) uuid: #{uuid}, attribute_name, #{attribute_name}" if filepath.nil?
         Blades::setAttribute1(filepath, attribute_name, value)

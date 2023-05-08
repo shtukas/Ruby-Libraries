@@ -28,28 +28,12 @@ require 'find'
 
 require_relative "Blades.rb"
 
+
+# NxD001: {items: Array[Items], next: null or cache location}
+
 # -----------------------------------------------------------------------------------
 
-=begin
-    $LBXs = Array[LBX]
-    LBX = Map[attribute, value] # all the values of a given blade
-=end
-
-$LBXs = []
-
 class Solingen
-
-    # Solingen::getLBXOrNull(uuid)
-    def self.getLBXOrNull(uuid)
-        $LBXs.select{|lbx| lbx["uuid"] == uuid }.first.clone
-    end
-
-    # Solingen::replaceLBX(lbx)
-    def self.replaceLBX(lbx)
-        raise "(error: b8a21fc4-b939-4604-93ba-e979f73d271c) no uuid found in lbx: #{lbx}" if lbx["uuid"].nil?
-        raise "(error: b8a21fc4-b939-4604-93ba-e979f73d271c) no uuid found in lbx: #{lbx}" if lbx["mikuType"].nil?
-        $LBXs = $LBXs.reject{|i| i["uuid"] == lbx["uuid"] } + [lbx.clone]
-    end
 
     # Solingen::bladesFilepathsEnumerator()
     def self.bladesFilepathsEnumerator()
@@ -66,23 +50,51 @@ class Solingen
         end
     end
 
+    # ----------------------------------------------
+    # Data Optimization
+
+    # Solingen::registerMikuType(mikuType)
+    def self.registerMikuType(mikuType)
+        mikuTypes = Solingen::mikuTypes()
+        return if mikuTypes.include?(mikuType)
+        mikuTypes = mikuTypes + [mikuType]
+        XCache::set("mikuTypes:49132348-46f3-4814-8e27-50", JSON.generate(mikuTypes))
+    end
+
+    # Solingen::registerItem(item)
+    def self.registerItem(item)
+        mikuType = item["mikuType"]
+        Solingen::registerMikuType(item["mikuType"])
+        XCache::set("uuid(#{item["uuid"]})->item:91ea-d56a5135b895", JSON.generate(item))
+        items = Solingen::mikuTypeItems(mikuType).reject{|i| i["uuid"] == item["uuid"] } + [item]
+        XCache::set("mikuType(#{mikuType})->items:4f15-bb9c-1f1a7f1ad21", JSON.generate(items))
+    end
+
+    # Solingen::reloadAndRegisterItemFromDisk(uuid)
+    def self.reloadAndRegisterItemFromDisk(uuid)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        item = {}
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        # We go through all the values, because the one we want is the last one
+        db.execute("select * from records where operation_type=? order by operation_unixtime", ["attribute"]) do |row|
+            item[row["_name_"]] = JSON.parse(row["_data_"])
+        end
+        db.close
+        puts "Solingen::reloadAndRegisterItemFromDisk(#{uuid}): #{JSON.pretty_generate(item).green}"
+        Solingen::registerItem(item)
+    end
+
     # Solingen::load()
     def self.load()
-        puts "Solingen::load()"
         Solingen::bladesFilepathsEnumerator().each{|filepath|
-            lbx = {}
-            db = SQLite3::Database.new(filepath)
-            db.busy_timeout = 117
-            db.busy_handler { |count| true }
-            db.results_as_hash = true
-            # We go through all the values, because the one we want is the last one
-            db.execute("select * from records where operation_type=? order by operation_unixtime", ["attribute"]) do |row|
-                lbx[row["_name_"]] = JSON.parse(row["_data_"])
-            end
-            db.close
-            $LBXs << lbx
+            puts "Solingen::load(): #{filepath}"
+            uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
+            Solingen::reloadAndRegisterItemFromDisk(uuid)
         }
-        puts "loaded #{$LBXs.size} blades"
     end
 
     # ----------------------------------------------
@@ -91,26 +103,20 @@ class Solingen
     # Solingen::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
         Blades::init(mikuType, uuid)
-        Solingen::replaceLBX({
-            "uuid" => uuid,
-            "mikuType" => mikuType
-        })
+        Solingen::reloadAndRegisterItemFromDisk(uuid)
     end
 
     # Solingen::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
         Blades::setAttribute2(uuid, attribute_name, value)
-        lbx = Solingen::getLBXOrNull(uuid)
-        return if lbx.nil?
-        lbx[attribute_name] = value
-        Solingen::replaceLBX(lbx)
+        Solingen::reloadAndRegisterItemFromDisk(uuid)
     end
 
     # Solingen::getAttributeOrNull2(uuid, attribute_name)
     def self.getAttributeOrNull2(uuid, attribute_name)
-        lbx = Solingen::getLBXOrNull(uuid)
-        return lbx[attribute_name] if lbx
-        nil
+        item = Solingen::getItemOrNull(uuid)
+        return nil if nil?
+        item[attribute_name]
     end
 
     # Solingen::getMandatoryAttribute2(uuid, attribute_name)
@@ -150,30 +156,58 @@ class Solingen
     # Solingen::destroy(uuid)
     def self.destroy(uuid)
         Blades::destroy(uuid)
+        Solingen::mikuTypes().each{|mikuType|
+            items = Solingen::mikuTypeItems(mikuType).reject{|i| i["uuid"] == item["uuid"] }
+            XCache::set("mikuType(#{mikuType})->items:4f15-bb9c-1f1a7f1ad21", JSON.generate(items))
+        }
     end
 
     # ----------------------------------------------
-    # Data
+    # Solingen Service
 
     # Solingen::mikuTypes()
     def self.mikuTypes()
-        $LBXs.map{|lbx| lbx["mikuType"] }.uniqu.sort
-    end
-
-    # Solingen::mikuTypeCount(mikuType)
-    def self.mikuTypeCount(mikuType)
-        $LBXs.select{|lbx| lbx["mikuType"] == mikuType }.size
+        s = XCache::getOrNull("mikuTypes:49132348-46f3-4814-8e27-50")
+        if s then
+            return JSON.parse(s)
+        else
+            mikuTypes = []
+            XCache::set("mikuTypes:49132348-46f3-4814-8e27-50", JSON.generate(mikuTypes))
+            return mikuTypes
+        end
     end
 
     # Solingen::mikuTypeItems(mikuType)
     def self.mikuTypeItems(mikuType)
-        $LBXs.select{|lbx| lbx["mikuType"] == mikuType }
+        Solingen::registerMikuType(mikuType)
+        items = XCache::getOrNull("mikuType(#{mikuType})->items:4f15-bb9c-1f1a7f1ad21")
+        if items then
+            return JSON.parse(items)
+        else
+            items = []
+            XCache::set("mikuType(#{mikuType})->items:4f15-bb9c-1f1a7f1ad21", JSON.generate(items))
+            return items
+        end
     end
 
     # Solingen::getItemOrNull(uuid)
     def self.getItemOrNull(uuid)
-        $LBXs.select{|lbx| lbx["uuid"] == uuid }.first
+        item = XCache::getOrNull("uuid(#{uuid})->item:91ea-d56a5135b895")
+        if item then
+            return JSON.parse(item)
+        else
+            return nil
+        end
+    end
+
+    # Solingen::mikuTypeCount(mikuType)
+    def self.mikuTypeCount(mikuType)
+        Solingen::mikuTypeItems(mikuType).size
     end
 end
 
-Solingen::load()
+unixtime = XCache::getOrNull("9beb2975-6611-4cb9-b5c6-4dbeecdf780a")
+if unixtime.nil? or (Time.new.to_i - unixtime.to_i) >= 86400 then
+    Solingen::load()
+    XCache::set("9beb2975-6611-4cb9-b5c6-4dbeecdf780a", Time.new.to_i)
+end
