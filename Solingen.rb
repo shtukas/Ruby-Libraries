@@ -28,10 +28,11 @@ require 'find'
 
 require_relative "Blades.rb"
 
-
 # NxD001: {items: Array[Items], next: null or cache location}
 
 # -----------------------------------------------------------------------------------
+
+$SolingeninMemoryItems = nil
 
 class Solingen
 
@@ -71,13 +72,13 @@ class Solingen
     # Solingen::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
         Blades::init(mikuType, uuid)
-        Solingen::loadItemFromDiskByUUIDAndCacheIntoDateFile(uuid)
+        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
     end
 
     # Solingen::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
         Blades::setAttribute2(uuid, attribute_name, value)
-        Solingen::loadItemFromDiskByUUIDAndCacheIntoDateFile(uuid)
+        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
     end
 
     # Solingen::getAttributeOrNull2(uuid, attribute_name)
@@ -124,14 +125,14 @@ class Solingen
     # Solingen::destroy(uuid)
     def self.destroy(uuid)
         Blades::destroy(uuid)
-        Solingen::getMikuTypesCached().each{|mikuType|
+        Solingen::getMikuTypesFromInMemory().each{|mikuType|
             items = Solingen::mikuTypeItems(mikuType).reject{|i| i["uuid"] == item["uuid"] }
             XCache::set("mikuType(#{mikuType})->items:4f15-bb9c-1f1a7f1ad21", JSON.generate(items))
         }
     end
 
     # ----------------------------------------------
-    # Solingen Service Private
+    # Solingen Service Private: 
 
     # create table _items_ (_uuid_ string primary key, _mikuType_ string, _position_ float, _item_ string)
 
@@ -160,23 +161,35 @@ class Solingen
         dbfilepath
     end
 
-    # Solingen::getMikuTypesCached()
-    def self.getMikuTypesCached()
-        mikuTypes = []
+    # Solingen::getInMemoryItems()
+    def self.getInMemoryItems()
+        return $SolingeninMemoryItems if $SolingeninMemoryItems
+        $SolingeninMemoryItems = {} # Map[mikuType, Map[uuid, item]
+
         db = SQLite3::Database.new(Solingen::dataFilepath())
         db.busy_timeout = 117
         db.busy_handler { |count| true }
         db.results_as_hash = true
         # We go through all the values, because the one we want is the last one
-        db.execute("select _mikuType_ from _items_", []) do |row|
-            mikuTypes << row["_mikuType_"]
+        db.execute("select * from _items_", []) do |row|
+            item = JSON.parse(row["_item_"])
+            if $SolingeninMemoryItems[item["mikuType"]].nil? then
+                $SolingeninMemoryItems[item["mikuType"]] = {}
+            end
+            $SolingeninMemoryItems[item["mikuType"]][item["uuid"]] = item
         end
         db.close
-        mikuTypes.uniq
+
+        $SolingeninMemoryItems
     end
 
-    # Solingen::putItemIntoDataFile(item)
-    def self.putItemIntoDataFile(item)
+    # Solingen::getMikuTypesFromInMemory()
+    def self.getMikuTypesFromInMemory()
+        Solingen::getInMemoryItems().keys
+    end
+
+    # Solingen::putItemIntoDataFileAndInMemory(item)
+    def self.putItemIntoDataFileAndInMemory(item)
         db = SQLite3::Database.new(Solingen::dataFilepath())
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -184,21 +197,29 @@ class Solingen
         db.execute "delete from _items_ where _uuid_=?", [item["uuid"]]
         db.execute "insert into _items_ (_uuid_, _mikuType_, _position_, _item_) values (?, ?, ?, ?)", [item["uuid"], item["mikuType"], item["position"] || 0, JSON.generate(item)]
         db.close
+
+        mikuTypes = Solingen::getInMemoryItems().keys
+        data = Solingen::getInMemoryItems()
+        mikuTypes.each{|mikuType|
+            data[mikuTypes].delete(item["uuid"])
+        }
+        data[item["mikuType"]][item["uuid"]] = item
+        $SolingeninMemoryItems = data
     end
 
-    # Solingen::loadItemFromDiskByUUIDOrNull(uuid)
-    def self.loadItemFromDiskByUUIDOrNull(uuid)
+    # Solingen::getItemFromDiskByUUIDOrNull(uuid)
+    def self.getItemFromDiskByUUIDOrNull(uuid)
         filepath = Blades::uuidToFilepathOrNull(uuid)
         return nil if filepath.nil?
         Solingen::getBladeAsItem(filepath)
     end
 
-    # Solingen::loadItemFromDiskByUUIDAndCacheIntoDateFile(uuid)
-    def self.loadItemFromDiskByUUIDAndCacheIntoDateFile(uuid)
-        item = Solingen::loadItemFromDiskByUUIDOrNull(uuid)
+    # Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+    def self.loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+        item = Solingen::getItemFromDiskByUUIDOrNull(uuid)
         return if item.nil?
-        puts "Solingen::loadItemFromDiskByUUIDAndCacheIntoDateFile(#{uuid}): #{JSON.pretty_generate(item).green}"
-        Solingen::putItemIntoDataFile(item)
+        puts "Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(#{uuid}): #{JSON.pretty_generate(item).green}"
+        Solingen::putItemIntoDataFileAndInMemory(item)
     end
 
     # ----------------------------------------------
@@ -206,45 +227,30 @@ class Solingen
 
     # Solingen::mikuTypes()
     def self.mikuTypes()
-        Solingen::getMikuTypesCached()
+        Solingen::getInMemoryItems().keys
     end
 
     # Solingen::mikuTypeItems(mikuType)
     def self.mikuTypeItems(mikuType)
-        items = []
-        db = SQLite3::Database.new(Solingen::dataFilepath())
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        # We go through all the values, because the one we want is the last one
-        db.execute("select * from _items_ where _mikuType_=? order by _position_", [mikuType]) do |row|
-            items << JSON.parse(row["_item_"])
-        end
-        db.close
-        items
+        data = Solingen::getInMemoryItems()
+        return [] if data[mikuType].nil?
+        data[mikuType].values
     end
 
     # Solingen::getItemOrNull(uuid)
     def self.getItemOrNull(uuid)
-        item = Solingen::loadItemFromDiskByUUIDOrNull(uuid)
-        return nil if item.nil?
-        Solingen::putItemIntoDataFile(item)
-        item
+        mikuTypes = Solingen::getInMemoryItems().keys
+        data = Solingen::getInMemoryItems()
+        mikuTypes.each{|mikuType|
+            return data[mikuType][uuid] if data[mikuType][uuid]
+        }
+        nil
     end
 
     # Solingen::mikuTypeCount(mikuType)
     def self.mikuTypeCount(mikuType)
-        value = nil
-        db = SQLite3::Database.new(Solingen::dataFilepath())
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        # We go through all the values, because the one we want is the last one
-        db.execute("select count(*) as _count_ from _items_ where _mikuType_=?", [mikuType]) do |row|
-            value = row["_count_"]
-        end
-        db.close
-        raise "(error: 51803509-3648-44c6-ac14-2ee87c4e0e51) mikuType: #{mikuType}" if value.nil?
-        value
+        data = Solingen::getInMemoryItems()
+        return 0 if data[mikuType].nil?
+        data[mikuType].values.size
     end
 end
