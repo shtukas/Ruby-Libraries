@@ -243,7 +243,6 @@ Thread.new {
             uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
             next if XCache::getFlag("d1af995a-2b1e-465e-a8d1-3c56e937ea4a:#{filepath}") # we have already seen this one
-            puts "processing unknown blade: #{filepath}".green
             data = Solingen::getInMemoryData()
             item = Solingen::getBladeAsItem(filepath)
             if data[item["mikuType"]].nil? then
