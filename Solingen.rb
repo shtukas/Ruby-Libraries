@@ -32,7 +32,7 @@ require_relative "Blades.rb"
 
 # -----------------------------------------------------------------------------------
 
-$SolingeninMemoryItems = nil
+$SolingeninMemoryData = nil
 
 class Solingen
 
@@ -69,75 +69,55 @@ class Solingen
         item
     end
 
-    # Solingen::dataFilepath()
-    def self.dataFilepath()
-        dbfilepath = XCache::filepath("5f490a6e-e172-436f-9a1f-f581597c3451")
-        if !File.exist?(dbfilepath) then
-            puts "> initialising data file"
-            db = SQLite3::Database.new(dbfilepath)
-            db.busy_timeout = 117
-            db.busy_handler { |count| true }
-            db.results_as_hash = true
-            db.execute("create table _items_ (_uuid_ string primary key, _mikuType_ string, _position_ float, _item_ string)", [])
+    # Solingen::getInMemoryData()
+    def self.getInMemoryData()
+        return $SolingeninMemoryData if $SolingeninMemoryData
+        $SolingeninMemoryData = {} # Map[mikuType, Map[uuid, item]]
 
-            Solingen::bladesFilepathsEnumerator().each{|bladefilepath|
-                puts "> initialising data file: blade filepath: #{bladefilepath}"
-                uuid = Blades::getMandatoryAttribute1(bladefilepath, "uuid")
-                XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", bladefilepath)
-                item = Solingen::getBladeAsItem(bladefilepath)
-                db.execute "delete from _items_ where _uuid_=?", [item["uuid"]]
-                db.execute "insert into _items_ (_uuid_, _mikuType_, _position_, _item_) values (?, ?, ?, ?)", [item["uuid"], item["mikuType"], item["position"] || 0, JSON.generate(item)]
-            }
-
-            db.close
+        data = XCache::getOrNull("7ea6cdc2-c1fe-4e89-89d2-6f29bad54bed")
+        if data then
+            data = JSON.parse(data)
+            $SolingeninMemoryData = data
+            return $SolingeninMemoryData
         end
-        dbfilepath
+
+        data = {}
+        puts "Initialising Solingen data from blades"
+        Solingen::bladesFilepathsEnumerator().each{|filepath|
+            puts "> Initialising Solingen data from blades: blade filepath: #{filepath}"
+            uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
+            item = Solingen::getBladeAsItem(filepath)
+            if data[item["mikuType"]].nil? then
+                data[item["mikuType"]] = {}
+            end
+            data[item["mikuType"]][item["uuid"]] = item
+        }
+
+        XCache::set("7ea6cdc2-c1fe-4e89-89d2-6f29bad54bed", JSON.generate(data))
+        $SolingeninMemoryData = data
+        $SolingeninMemoryData
     end
 
-    # Solingen::getInMemoryItems()
-    def self.getInMemoryItems()
-        return $SolingeninMemoryItems if $SolingeninMemoryItems
-        $SolingeninMemoryItems = {} # Map[mikuType, Map[uuid, item]
-
-        db = SQLite3::Database.new(Solingen::dataFilepath())
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        # We go through all the values, because the one we want is the last one
-        db.execute("select * from _items_", []) do |row|
-            item = JSON.parse(row["_item_"])
-            if $SolingeninMemoryItems[item["mikuType"]].nil? then
-                $SolingeninMemoryItems[item["mikuType"]] = {}
-            end
-            $SolingeninMemoryItems[item["mikuType"]][item["uuid"]] = item
-        end
-        db.close
-
-        $SolingeninMemoryItems
+    # Solingen::setInMemoryData(data)
+    def self.setInMemoryData(data)
+        XCache::set("7ea6cdc2-c1fe-4e89-89d2-6f29bad54bed", JSON.generate(data))
+        $SolingeninMemoryData = data
     end
 
     # Solingen::getMikuTypesFromInMemory()
     def self.getMikuTypesFromInMemory()
-        Solingen::getInMemoryItems().keys
+        Solingen::getInMemoryData().keys
     end
 
-    # Solingen::putItemIntoDataFileAndInMemory(item)
-    def self.putItemIntoDataFileAndInMemory(item)
-        db = SQLite3::Database.new(Solingen::dataFilepath())
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        db.execute "delete from _items_ where _uuid_=?", [item["uuid"]]
-        db.execute "insert into _items_ (_uuid_, _mikuType_, _position_, _item_) values (?, ?, ?, ?)", [item["uuid"], item["mikuType"], item["position"] || 0, JSON.generate(item)]
-        db.close
-
-        mikuTypes = Solingen::getInMemoryItems().keys
-        data = Solingen::getInMemoryItems()
-        mikuTypes.each{|mikuType|
+    # Solingen::putItemIntoInMemoryData(item)
+    def self.putItemIntoInMemoryData(item)
+        data = Solingen::getInMemoryData()
+        data.keys.each{|mikuType|
             data[mikuType].delete(item["uuid"])
         }
         data[item["mikuType"]][item["uuid"]] = item
-        $SolingeninMemoryItems = data
+        Solingen::setInMemoryData(data)
     end
 
     # Solingen::getItemFromDiskByUUIDOrNull(uuid)
@@ -147,12 +127,11 @@ class Solingen
         Solingen::getBladeAsItem(filepath)
     end
 
-    # Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
-    def self.loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+    # Solingen::loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
+    def self.loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
         item = Solingen::getItemFromDiskByUUIDOrNull(uuid)
         return if item.nil?
-        puts "Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(#{uuid}): #{JSON.pretty_generate(item).green}"
-        Solingen::putItemIntoDataFileAndInMemory(item)
+        Solingen::putItemIntoInMemoryData(item)
     end
 
     # ----------------------------------------------
@@ -161,13 +140,13 @@ class Solingen
     # Solingen::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
         Blades::init(mikuType, uuid)
-        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+        Solingen::loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
     end
 
     # Solingen::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
         Blades::setAttribute2(uuid, attribute_name, value)
-        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+        Solingen::loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
     end
 
     # Solingen::getAttributeOrNull2(uuid, attribute_name)
@@ -215,19 +194,12 @@ class Solingen
     def self.destroy(uuid)
         Blades::destroy(uuid)
 
-        db = SQLite3::Database.new(Solingen::dataFilepath())
-        db.busy_timeout = 117
-        db.busy_handler { |count| true }
-        db.results_as_hash = true
-        db.execute "delete from _items_ where _uuid_=?", [uuid]
-        db.close
-
-        mikuTypes = Solingen::getInMemoryItems().keys
-        data = Solingen::getInMemoryItems()
+        mikuTypes = Solingen::getInMemoryData().keys
+        data = Solingen::getInMemoryData()
         mikuTypes.each{|mikuType|
             data[mikuType].delete(uuid)
         }
-        $SolingeninMemoryItems = data
+        Solingen::setInMemoryData(data)
     end
 
     # ----------------------------------------------
@@ -235,20 +207,20 @@ class Solingen
 
     # Solingen::mikuTypes()
     def self.mikuTypes()
-        Solingen::getInMemoryItems().keys
+        Solingen::getInMemoryData().keys
     end
 
     # Solingen::mikuTypeItems(mikuType)
     def self.mikuTypeItems(mikuType)
-        data = Solingen::getInMemoryItems()
+        data = Solingen::getInMemoryData()
         return [] if data[mikuType].nil?
         data[mikuType].values
     end
 
     # Solingen::getItemOrNull(uuid)
     def self.getItemOrNull(uuid)
-        mikuTypes = Solingen::getInMemoryItems().keys
-        data = Solingen::getInMemoryItems()
+        mikuTypes = Solingen::getInMemoryData().keys
+        data = Solingen::getInMemoryData()
         mikuTypes.each{|mikuType|
             return data[mikuType][uuid] if data[mikuType][uuid]
         }
@@ -257,8 +229,31 @@ class Solingen
 
     # Solingen::mikuTypeCount(mikuType)
     def self.mikuTypeCount(mikuType)
-        data = Solingen::getInMemoryItems()
+        data = Solingen::getInMemoryData()
         return 0 if data[mikuType].nil?
         data[mikuType].values.size
     end
 end
+
+Thread.new {
+    loop {
+        sleep 120
+        next if $SolingeninMemoryData.nil?
+        Solingen::bladesFilepathsEnumerator().each{|filepath|
+            uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
+            next if XCache::getFlag("d1af995a-2b1e-465e-a8d1-3c56e937ea4a:#{filepath}") # we have already seen this one
+            puts "processing unknown blade: #{filepath}".green
+            data = Solingen::getInMemoryData()
+            item = Solingen::getBladeAsItem(filepath)
+            if data[item["mikuType"]].nil? then
+                data[item["mikuType"]] = {}
+            end
+            data[item["mikuType"]][item["uuid"]] = item
+            Solingen::setInMemoryData(data)
+            XCache::setFlag("d1af995a-2b1e-465e-a8d1-3c56e937ea4a:#{filepath}", true)
+        }
+
+    }
+}
+
