@@ -244,12 +244,18 @@ end
 
 Thread.new {
     loop {
-        sleep 120
+        sleep 300
         next if $SolingeninMemoryData.nil?
         Solingen::bladesFilepathsEnumerator().each{|filepath|
             uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
-            if Blades::getAttributeOrNull1(filepath, "deleted") then
+            if (unixtime = Blades::getAttributeOrNull1(filepath, "deleted")) then
                 Solingen::destroyInMemory(uuid)
+                # The value of the attribute is the unixtime of deletion. We keep the blades for 7 days, before permanently deleting them
+                # That period was chosen because we keep the stored version of in memory data only 7 days
+                if (Time.new.to_i - unixtime) > 86400*7 then
+                    FileUtils.rm(filepath)
+                end
+                next
             end
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
             next if XCache::getFlag("d1af995a-2b1e-465e-a8d1-3c56e937ea4a:#{filepath}") # we have already seen this one
@@ -262,7 +268,6 @@ Thread.new {
             Solingen::setInMemoryData(data)
             XCache::setFlag("d1af995a-2b1e-465e-a8d1-3c56e937ea4a:#{filepath}", true)
         }
-
     }
 }
 
