@@ -95,6 +95,7 @@ class Blades
 
         # Got nothing from the uuid -> filepath mapping
         # Running exhaustive search.
+        puts "Running exhaustive search to find filepath for uuid: #{uuid}"
 
         Find.find(Blades::bladeRepository()) do |filepath|
             next if !File.file?(filepath)
