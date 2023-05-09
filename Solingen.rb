@@ -116,6 +116,9 @@ class Solingen
         data.keys.each{|mikuType|
             data[mikuType].delete(item["uuid"])
         }
+        if data[item["mikuType"]].nil? then
+            data[item["mikuType"]] = {}
+        end
         data[item["mikuType"]][item["uuid"]] = item
         Solingen::setInMemoryData(data)
     end
