@@ -155,7 +155,7 @@ class Solingen
     # Solingen::getAttributeOrNull2(uuid, attribute_name)
     def self.getAttributeOrNull2(uuid, attribute_name)
         item = Solingen::getItemOrNull(uuid)
-        return nil if nil?
+        return nil if item.nil?
         item[attribute_name]
     end
 
