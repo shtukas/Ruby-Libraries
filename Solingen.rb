@@ -36,6 +36,9 @@ $SolingeninMemoryItems = nil
 
 class Solingen
 
+    # ----------------------------------------------
+    # Solingen Service Private
+
     # Solingen::bladesFilepathsEnumerator()
     def self.bladesFilepathsEnumerator()
         Enumerator.new do |filepaths|
@@ -65,76 +68,6 @@ class Solingen
         db.close
         item
     end
-
-    # ----------------------------------------------
-    # Blade Bridge
-
-    # Solingen::init(mikuType, uuid) # String : filepath
-    def self.init(mikuType, uuid)
-        Blades::init(mikuType, uuid)
-        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
-    end
-
-    # Solingen::setAttribute2(uuid, attribute_name, value)
-    def self.setAttribute2(uuid, attribute_name, value)
-        Blades::setAttribute2(uuid, attribute_name, value)
-        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
-    end
-
-    # Solingen::getAttributeOrNull2(uuid, attribute_name)
-    def self.getAttributeOrNull2(uuid, attribute_name)
-        item = Solingen::getItemOrNull(uuid)
-        return nil if nil?
-        item[attribute_name]
-    end
-
-    # Solingen::getMandatoryAttribute2(uuid, attribute_name)
-    def self.getMandatoryAttribute2(uuid, attribute_name)
-        value = Solingen::getAttributeOrNull2(uuid, attribute_name)
-        if value.nil? then
-            raise "(error: 1052d5d1-6c5b-4b58-b470-22de8b68f4c8) Failing mandatory attribute '#{attribute_name}' at blade uuid: '#{uuid}'"
-        end
-        value
-    end
-
-    # Solingen::addToSet2(uuid, set_name, value_id, value)
-    def self.addToSet2(uuid, set_name, value_id, value)
-        Blades::addToSet2(uuid, set_name, value_id, value)
-    end
-
-    # Solingen::removeFromSet2(uuid, set_name, value_id)
-    def self.removeFromSet2(uuid, set_name, value_id)
-        Blades::removeFromSet2(uuid, set_name, value_id)
-    end
-
-    # Solingen::getSet2(uuid, set_name)
-    def self.getSet2(uuid, set_name)
-        Blades::getSet2(uuid, set_name)
-    end
-
-    # Solingen::putDatablob2(uuid, datablob)  # nhash
-    def self.putDatablob2(uuid, datablob)
-        Blades::putDatablob2(uuid, datablob)
-    end
-
-    # Solingen::getDatablobOrNull2(uuid, nhash)
-    def self.getDatablobOrNull2(uuid, nhash)
-        Blades::getDatablobOrNull2(uuid, nhash)
-    end
-
-    # Solingen::destroy(uuid)
-    def self.destroy(uuid)
-        Blades::destroy(uuid)
-        Solingen::getMikuTypesFromInMemory().each{|mikuType|
-            items = Solingen::mikuTypeItems(mikuType).reject{|i| i["uuid"] == item["uuid"] }
-            XCache::set("mikuType(#{mikuType})->items:4f15-bb9c-1f1a7f1ad21", JSON.generate(items))
-        }
-    end
-
-    # ----------------------------------------------
-    # Solingen Service Private: 
-
-    # create table _items_ (_uuid_ string primary key, _mikuType_ string, _position_ float, _item_ string)
 
     # Solingen::dataFilepath()
     def self.dataFilepath()
@@ -223,7 +156,82 @@ class Solingen
     end
 
     # ----------------------------------------------
-    # Solingen Service Interface
+    # Solingen Service Public, Blade Bridge
+
+    # Solingen::init(mikuType, uuid) # String : filepath
+    def self.init(mikuType, uuid)
+        Blades::init(mikuType, uuid)
+        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+    end
+
+    # Solingen::setAttribute2(uuid, attribute_name, value)
+    def self.setAttribute2(uuid, attribute_name, value)
+        Blades::setAttribute2(uuid, attribute_name, value)
+        Solingen::loadItemFromDiskByUUIDAndputsIntoDataFileAndInMemory(uuid)
+    end
+
+    # Solingen::getAttributeOrNull2(uuid, attribute_name)
+    def self.getAttributeOrNull2(uuid, attribute_name)
+        item = Solingen::getItemOrNull(uuid)
+        return nil if nil?
+        item[attribute_name]
+    end
+
+    # Solingen::getMandatoryAttribute2(uuid, attribute_name)
+    def self.getMandatoryAttribute2(uuid, attribute_name)
+        value = Solingen::getAttributeOrNull2(uuid, attribute_name)
+        if value.nil? then
+            raise "(error: 1052d5d1-6c5b-4b58-b470-22de8b68f4c8) Failing mandatory attribute '#{attribute_name}' at blade uuid: '#{uuid}'"
+        end
+        value
+    end
+
+    # Solingen::addToSet2(uuid, set_name, value_id, value)
+    def self.addToSet2(uuid, set_name, value_id, value)
+        Blades::addToSet2(uuid, set_name, value_id, value)
+    end
+
+    # Solingen::removeFromSet2(uuid, set_name, value_id)
+    def self.removeFromSet2(uuid, set_name, value_id)
+        Blades::removeFromSet2(uuid, set_name, value_id)
+    end
+
+    # Solingen::getSet2(uuid, set_name)
+    def self.getSet2(uuid, set_name)
+        Blades::getSet2(uuid, set_name)
+    end
+
+    # Solingen::putDatablob2(uuid, datablob)  # nhash
+    def self.putDatablob2(uuid, datablob)
+        Blades::putDatablob2(uuid, datablob)
+    end
+
+    # Solingen::getDatablobOrNull2(uuid, nhash)
+    def self.getDatablobOrNull2(uuid, nhash)
+        Blades::getDatablobOrNull2(uuid, nhash)
+    end
+
+    # Solingen::destroy(uuid)
+    def self.destroy(uuid)
+        Blades::destroy(uuid)
+
+        db = SQLite3::Database.new(Solingen::dataFilepath())
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute "delete from _items_ where _uuid_=?", [uuid]
+        db.close
+
+        mikuTypes = Solingen::getInMemoryItems().keys
+        data = Solingen::getInMemoryItems()
+        mikuTypes.each{|mikuType|
+            data[mikuType].delete(uuid)
+        }
+        $SolingeninMemoryItems = data
+    end
+
+    # ----------------------------------------------
+    # Solingen Service Interface, Collections
 
     # Solingen::mikuTypes()
     def self.mikuTypes()
