@@ -137,6 +137,16 @@ class Solingen
         Solingen::putItemIntoInMemoryData(item)
     end
 
+    # Solingen::destroyInMemory(uuid)
+    def self.destroyInMemory(uuid)
+        mikuTypes = Solingen::getInMemoryData().keys
+        data = Solingen::getInMemoryData()
+        mikuTypes.each{|mikuType|
+            data[mikuType].delete(uuid)
+        }
+        Solingen::setInMemoryData(data)
+    end
+
     # ----------------------------------------------
     # Solingen Service Public, Blade Bridge
 
@@ -196,13 +206,7 @@ class Solingen
     # Solingen::destroy(uuid)
     def self.destroy(uuid)
         Blades::destroy(uuid)
-
-        mikuTypes = Solingen::getInMemoryData().keys
-        data = Solingen::getInMemoryData()
-        mikuTypes.each{|mikuType|
-            data[mikuType].delete(uuid)
-        }
-        Solingen::setInMemoryData(data)
+        Solingen::destroyInMemory(uuid)
     end
 
     # ----------------------------------------------
@@ -244,6 +248,9 @@ Thread.new {
         next if $SolingeninMemoryData.nil?
         Solingen::bladesFilepathsEnumerator().each{|filepath|
             uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+            if Blades::getAttributeOrNull1(filepath, "deleted") then
+                Solingen::destroyInMemory(uuid)
+            end
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
             next if XCache::getFlag("d1af995a-2b1e-465e-a8d1-3c56e937ea4a:#{filepath}") # we have already seen this one
             data = Solingen::getInMemoryData()

@@ -61,8 +61,10 @@ reserved attributes:
     - mikuType : String
     - next     : (optional) uuid of the next blade in the sequence
     - previous : (optional) uuid of the previous blade in the sequence (mostly for blade garbage collection)
+    - deleted  : (optional) indicates that the blade has been logically deleted, the value is the unixtime of deletion.
 
 NxPure is a MikuType reserved for datablob-only carrying blades (essentially `next` blades)
+
 
 =end
 
@@ -359,8 +361,8 @@ class Blades
     def self.destroy(uuid)
         filepath = Blades::uuidToFilepathOrNull(uuid)
         return if filepath.nil?
-        puts "Blades::destroy(#{uuid}) destroying filepath: #{filepath}".green
-        FileUtils.rm(filepath)
+        puts "Blades::destroy(#{uuid}) mark as logically deleted: #{filepath}".green
+        Blades::setAttribute1(filepath, "deleted", Time.new.to_i) # We mark the blade as logically deleted
     end
 end
 
