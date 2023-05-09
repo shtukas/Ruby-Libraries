@@ -201,7 +201,7 @@ class Solingen
         mikuTypes = Solingen::getInMemoryItems().keys
         data = Solingen::getInMemoryItems()
         mikuTypes.each{|mikuType|
-            data[mikuTypes].delete(item["uuid"])
+            data[mikuType].delete(item["uuid"])
         }
         data[item["mikuType"]][item["uuid"]] = item
         $SolingeninMemoryItems = data
