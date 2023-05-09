@@ -359,6 +359,7 @@ class Blades
     def self.destroy(uuid)
         filepath = Blades::uuidToFilepathOrNull(uuid)
         return if filepath.nil?
+        puts "Blades::destroy(#{uuid}) destroying filepath: #{filepath}".green
         FileUtils.rm(filepath)
     end
 end
