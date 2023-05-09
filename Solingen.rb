@@ -39,21 +39,6 @@ class Solingen
     # ----------------------------------------------
     # Solingen Service Private
 
-    # Solingen::bladesFilepathsEnumerator()
-    def self.bladesFilepathsEnumerator()
-        Enumerator.new do |filepaths|
-           begin
-                Find.find(Blades::bladeRepository()) do |path|
-                    next if !File.file?(path)
-                    if Blades::isBlade(path) then
-                        filepaths << path
-                    end
-                end
-            rescue
-            end
-        end
-    end
-
     # Solingen::getBladeAsItem(filepath)
     def self.getBladeAsItem(filepath)
         item = {}
@@ -83,7 +68,7 @@ class Solingen
 
         data = {}
         puts "Initialising Solingen data from blades"
-        Solingen::bladesFilepathsEnumerator().each{|filepath|
+        Blades::filepathsEnumerator().each{|filepath|
             puts "> Initialising Solingen data from blades: blade filepath: #{filepath}"
             uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
@@ -246,8 +231,20 @@ Thread.new {
     loop {
         sleep 300
         next if $SolingeninMemoryData.nil?
-        Solingen::bladesFilepathsEnumerator().each{|filepath|
+        Blades::filepathsEnumerator().each{|filepath|
+            next if !File.exist?(filepath)
+
             uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+
+            # First, let's compare that filepath is the recorded filepath for the uuid
+            # This will enable us to detect duplicate blades and merge them
+            knownFilepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
+            if knownFilepath and File.exist?(knownFilepath) and knownFilepath != filepath then
+                filepath1 = filepath
+                filepath2 = knownFilepath
+                filepath = Blades::merge(filepath1, filepath2)
+            end
+
             if (unixtime = Blades::getAttributeOrNull1(filepath, "deleted")) then
                 Solingen::destroyInMemory(uuid)
                 # The value of the attribute is the unixtime of deletion. We keep the blades for 7 days, before permanently deleting them
@@ -270,4 +267,3 @@ Thread.new {
         }
     }
 }
-

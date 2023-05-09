@@ -2,15 +2,19 @@
 
 =begin
 Blades
+    Blades::filepathsEnumerator()
     Blades::init(mikuType, uuid)
     Blades::uuidToFilepathOrNull(uuid)
     Blades::setAttribute1(filepath, attribute_name, value)
     Blades::setAttribute2(uuid, attribute_name, value)
     Blades::getAttributeOrNull1(filepath, attribute_name)
+    Blades::getAttributeOrNull2(uuid, attribute_name)
     Blades::getMandatoryAttribute1(filepath, attribute_name)
     Blades::getMandatoryAttribute2(uuid, attribute_name)
     Blades::addToSet1(filepath, set_name, value_id, value)
+    Blades::addToSet2(uuid, set_name, value_id, value)
     Blades::removeFromSet1(filpath, set_name, value_id)
+    Blades::removeFromSet2(uuid, set_name, value_id)
     Blades::putDatablob1(filepath, key, datablob)
     Blades::getDatablobOrNull1(filepath, key)
     Blades::destroy(uuid)
@@ -123,6 +127,53 @@ class Blades
 
     # ----------------------------------------------
     # Public
+
+    # Blades::filepathsEnumerator()
+    def self.filepathsEnumerator()
+        Enumerator.new do |filepaths|
+           begin
+                Find.find(Blades::bladeRepository()) do |path|
+                    next if !File.file?(path)
+                    if Blades::isBlade(path) then
+                        filepaths << path
+                    end
+                end
+            rescue
+            end
+        end
+    end
+
+    # Blades::merge(filepath1, filepath2) # filepath
+    def self.merge(filepath1, filepath2)
+        puts "> Blades::merge(filepath1, filepath2) request with filepath1: #{filepath1}, filepath2: #{filepath2}".green
+
+        if (filepath1 == filepath2) or !File.exist?(filepath1) or !File.exist?(filepath2) then
+            raise "> incorrect Blades::merge(filepath1, filepath2) request with filepath1: #{filepath1}, filepath2: #{filepath2}"
+        end
+
+        db1 = SQLite3::Database.new(filepath1)
+        db2 = SQLite3::Database.new(filepath2)
+
+        # We move all the objects from db1 to db2
+        # create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)
+
+        db1.busy_timeout = 117
+        db1.busy_handler { |count| true }
+        db1.results_as_hash = true
+        db1.execute("select * from records", []) do |row|
+            db2.execute "delete from records where record_uuid = ?", [row["record_uuid"]]
+            db2.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [row["record_uuid"], row["operation_unixtime"], row["operation_type"], row["_name_"], row["_data_"]]
+        end
+
+        db1.close
+        db2.close
+
+        # Let's now delete the first file 
+        FileUtils.rm(filepath1)
+
+        # And rename the second one
+        Blades::rename(filepath2)
+    end
 
     # Blades::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
@@ -315,7 +366,7 @@ class Blades
         nhash
     end
 
-    # Blades::putDatablob2(uuid, datablob)  # nhash
+    # Blades::putDatablob2(uuid, datablob) # nhash
     def self.putDatablob2(uuid, datablob)
         filepath = Blades::uuidToFilepathOrNull(uuid)
         raise "(error: 137dfd88-5ba1-4d2e-88ae-069b8d20b339) uuid: #{uuid}" if filepath.nil?
