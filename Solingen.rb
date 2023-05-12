@@ -219,6 +219,16 @@ class Solingen
         nil
     end
 
+    # Solingen::getItem(uuid)
+    def self.getItem(uuid)
+        mikuTypes = Solingen::getInMemoryData().keys
+        data = Solingen::getInMemoryData()
+        mikuTypes.each{|mikuType|
+            return data[mikuType][uuid] if data[mikuType][uuid]
+        }
+        raise "Solingen::getItem(uuid) could not find item for uuid: #{uuid}"
+    end
+
     # Solingen::mikuTypeCount(mikuType)
     def self.mikuTypeCount(mikuType)
         data = Solingen::getInMemoryData()
