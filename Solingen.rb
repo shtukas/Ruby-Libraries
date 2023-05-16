@@ -224,6 +224,10 @@ class SolingenAgent
         @items.select{|item| item["uuid"] == uuid }.first
     end
 
+    def mikuTypes()
+        @items.map{|item| item["mikuType"]}.uniq
+    end
+
     def mikuTypeItems(mikuType)
         @items.select{|item| item["mikuType"] == mikuType }
     end
