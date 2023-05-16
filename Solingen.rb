@@ -32,8 +32,6 @@ require_relative "Blades.rb"
 
 # -----------------------------------------------------------------------------------
 
-$SolingeninMemoryData = nil
-
 class Solingen
 
     # ----------------------------------------------
@@ -54,107 +52,19 @@ class Solingen
         item
     end
 
-    # Solingen::getInMemoryData()
-    def self.getInMemoryData()
-        return $SolingeninMemoryData if $SolingeninMemoryData
-        $SolingeninMemoryData = {} # Map[mikuType, Map[uuid, item]]
-
-        data = {}
-        puts "Initialising Solingen data from blades"
-        Blades::filepathsEnumerator().each{|filepath|
-            puts "> Initialising Solingen data from blades: blade filepath: #{filepath}"
-
-            uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
-
-            # First, let's compare that filepath is the recorded filepath for the uuid
-            # This will enable us to detect duplicate blades and merge them
-            knownFilepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
-            if knownFilepath and File.exist?(knownFilepath) and knownFilepath != filepath then
-                filepath1 = filepath
-                filepath2 = knownFilepath
-                filepath = Blades::merge(filepath1, filepath2)
-            end
-
-            if (unixtime = Blades::getAttributeOrNull1(filepath, "deleted")) then
-                if (Time.new.to_i - unixtime) > 86400*7 then
-                    FileUtils.rm(filepath)
-                end
-                next
-            end
-
-            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
-
-            item = Solingen::getBladeAsItem(filepath)
-            if data[item["mikuType"]].nil? then
-                data[item["mikuType"]] = {}
-            end
-            data[item["mikuType"]][item["uuid"]] = item
-        }
-
-        $SolingeninMemoryData = data
-        $SolingeninMemoryData
-    end
-
-    # Solingen::setInMemoryData(data)
-    def self.setInMemoryData(data)
-        $SolingeninMemoryData = data
-    end
-
-    # Solingen::getMikuTypesFromInMemory()
-    def self.getMikuTypesFromInMemory()
-        Solingen::getInMemoryData().keys
-    end
-
-    # Solingen::putItemIntoInMemoryData(item)
-    def self.putItemIntoInMemoryData(item)
-        data = Solingen::getInMemoryData()
-        data.keys.each{|mikuType|
-            data[mikuType].delete(item["uuid"])
-        }
-        if data[item["mikuType"]].nil? then
-            data[item["mikuType"]] = {}
-        end
-        data[item["mikuType"]][item["uuid"]] = item
-        Solingen::setInMemoryData(data)
-    end
-
-    # Solingen::getItemFromDiskByUUIDOrNull(uuid)
-    def self.getItemFromDiskByUUIDOrNull(uuid)
-        filepath = Blades::uuidToFilepathOrNull(uuid)
-        return nil if filepath.nil?
-        Solingen::getBladeAsItem(filepath)
-    end
-
-    # Solingen::loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
-    def self.loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
-        item = Solingen::getItemFromDiskByUUIDOrNull(uuid)
-        return if item.nil?
-        Solingen::putItemIntoInMemoryData(item)
-    end
-
-    # Solingen::destroyInMemory(uuid)
-    def self.destroyInMemory(uuid)
-        mikuTypes = Solingen::getInMemoryData().keys
-        data = Solingen::getInMemoryData()
-        mikuTypes.each{|mikuType|
-            data[mikuType].delete(uuid)
-        }
-        Solingen::setInMemoryData(data)
-    end
-
     # ----------------------------------------------
     # Solingen Service Public, Blade Bridge
 
     # Solingen::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
         Blades::init(mikuType, uuid)
-        Solingen::loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
+        $SolingenManager.init(mikuType, uuid)
     end
 
     # Solingen::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
         Blades::setAttribute2(uuid, attribute_name, value)
-        Solingen::loadItemFromDiskByUUIDAndUpdateInMemoryData(uuid)
+        $SolingenManager.setAttribute2(uuid, attribute_name, value)
     end
 
     # Solingen::getAttributeOrNull2(uuid, attribute_name)
@@ -201,7 +111,7 @@ class Solingen
     # Solingen::destroy(uuid)
     def self.destroy(uuid)
         Blades::destroy(uuid)
-        Solingen::destroyInMemory(uuid)
+        $SolingenManager.destroy(uuid)
     end
 
     # ----------------------------------------------
@@ -209,75 +119,195 @@ class Solingen
 
     # Solingen::mikuTypes()
     def self.mikuTypes()
-        Solingen::getInMemoryData().keys
+        $SolingenManager.mikuTypes()
     end
 
     # Solingen::mikuTypeItems(mikuType)
     def self.mikuTypeItems(mikuType)
-        data = Solingen::getInMemoryData()
-        return [] if data[mikuType].nil?
-        data[mikuType].values
+        $SolingenManager.mikuTypeItems(mikuType)
     end
 
     # Solingen::getItemOrNull(uuid)
     def self.getItemOrNull(uuid)
-        mikuTypes = Solingen::getInMemoryData().keys
-        data = Solingen::getInMemoryData()
-        mikuTypes.each{|mikuType|
-            return data[mikuType][uuid] if data[mikuType][uuid]
-        }
-        nil
+        $SolingenManager.getItemOrNull(uuid)
     end
 
     # Solingen::getItem(uuid)
     def self.getItem(uuid)
-        mikuTypes = Solingen::getInMemoryData().keys
-        data = Solingen::getInMemoryData()
-        mikuTypes.each{|mikuType|
-            return data[mikuType][uuid] if data[mikuType][uuid]
-        }
+        item = $SolingenManager.getItemOrNull(uuid)
+        return item if item
         raise "Solingen::getItem(uuid) could not find item for uuid: #{uuid}"
     end
 
     # Solingen::mikuTypeCount(mikuType)
     def self.mikuTypeCount(mikuType)
-        data = Solingen::getInMemoryData()
-        return 0 if data[mikuType].nil?
-        data[mikuType].values.size
+        $SolingenManager.mikuTypeCount(mikuType)
     end
 end
 
-Thread.new {
-    loop {
-        sleep 300
-        next if $SolingeninMemoryData.nil?
-        Blades::filepathsEnumerator().each{|filepath|
-            next if !File.exist?(filepath)
+class SolingenAgent
 
-            uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+    # @code
+    # @folderpath
+    # @foldertrace
 
-            # First, let's compare that filepath is the recorded filepath for the uuid
-            # This will enable us to detect duplicate blades and merge them
-            knownFilepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
-            if knownFilepath and File.exist?(knownFilepath) and knownFilepath != filepath then
-                filepath1 = filepath
-                filepath2 = knownFilepath
-                filepath = Blades::merge(filepath1, filepath2)
-            end
+    def initialize(code)
+        puts "Initializing agent #{code}"
+        @code = code
+        @folderpath = "#{Blades::bladeRepository()}/#{code}"
+        @foldertrace = computeFolderTrace(@folderpath)
+        @items = getItemsFromCacheOrNull()
+        if @items.nil? then
+            @items = getItemsFromDisk()
+            commitItemsToCache(@items)
+        end
+    end
 
-            if (unixtime = Blades::getAttributeOrNull1(filepath, "deleted")) then
-                Solingen::destroyInMemory(uuid)
-                # The value of the attribute is the unixtime of deletion. We keep the blades for 7 days, before permanently deleting them
-                # That period was chosen because we keep the stored version of in memory data only 7 days
-                if (Time.new.to_i - unixtime) > 86400*7 then
-                    FileUtils.rm(filepath)
+    def getItemsFromDisk()
+        items = []
+        LucilleCore::locationsAtFolder(@folderpath).each{|filepath|
+            if Blades::isBlade(filepath) then
+                uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+
+                # First, let's compare that filepath is the recorded filepath for the uuid
+                # This will enable us to detect duplicate blades and merge them
+
+                knownFilepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
+                if knownFilepath and File.exist?(knownFilepath) and knownFilepath != filepath then
+                    filepath1 = filepath
+                    filepath2 = knownFilepath
+                    filepath = Blades::merge(filepath1, filepath2)
                 end
-                next
-            end
-            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
 
-            item = Solingen::getBladeAsItem(filepath)
-            Solingen::putItemIntoInMemoryData(item)
+                XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
+
+                items << Solingen::getBladeAsItem(filepath)
+            end
         }
-    }
-}
+        items
+    end
+
+    def getItems()
+        @items
+    end
+
+    def commitItemsToCache(items)
+        XCache::set("ac22b4b9-3271-42cb-8e6d-c0b8817d73b9:#{@code}", JSON.generate(items))
+    end
+
+    def getItemsFromCacheOrNull()
+        items = XCache::getOrNull("ac22b4b9-3271-42cb-8e6d-c0b8817d73b9:#{@code}")
+        if items then
+            JSON.parse(items)
+        else
+            nil
+        end
+    end
+
+    def computeFolderTrace(folderpath)
+        LucilleCore::locationsAtFolder(folderpath)
+            .select{|filepath| Blades::isBlade(filepath) }
+            .reduce(folderpath){|trace, f| Digest::SHA1.hexdigest("#{trace}:#{f}")}
+    end
+
+    def reloadItemsFromDisk()
+        @items = getItemsFromDisk()
+        @foldertrace = computeFolderTrace(@folderpath)
+        commitItemsToCache(@items)
+    end
+
+    def getItemOrNull(uuid)
+        @items.select{|item| item["uuid"] == uuid }.first
+    end
+
+    def mikuTypeItems(mikuType)
+        @items.select{|item| item["mikuType"] == mikuType }
+    end
+
+    def mikuTypeCount(mikuType)
+        @items.select{|item| item["mikuType"] == mikuType }.size
+    end
+
+    def destroy(uuid)
+        @items = @items.reject{|item| item["uuid"] == uuid }
+    end
+
+    def setAttribute2(uuid, attribute_name, value)
+        @items = @items.map{ |item|
+            if item["uuid"] == uuid then
+                item[attribute_name] = value
+            end
+            item
+        }
+    end
+
+    def init(mikuType, uuid)
+        maintenance()
+    end
+
+    def maintenance()
+        if computeFolderTrace(@folderpath) != @foldertrace then
+            reloadItemsFromDisk()
+        end
+    end
+end
+
+class SolingenManager
+    def initialize()
+        @agents = []
+        LucilleCore::locationsAtFolder(Blades::bladeRepository())
+            .map{|folderpath|
+                next if !File.directory?(folderpath)
+                @agents << SolingenAgent.new(File.basename(folderpath))
+            }
+    end
+
+    def maintenance()
+        @agents.each{|agent| agent.maintenance()}
+    end
+
+    def getItems()
+        @agents.map{|agent| agent.getItems()}.flatten
+    end
+
+    def getItemOrNull(uuid)
+        @agents.each{|agent| 
+            item = agent.getItemOrNull(uuid)
+            return item if item
+        }
+        nil
+    end
+
+    def mikuTypes()
+        @agents.map{|agent| agent.mikuTypes()}.flatten.uniq
+    end
+
+    def mikuTypeItems(mikuType)
+        @agents.map{|agent| agent.mikuTypeItems(mikuType)}.flatten
+    end
+
+    def mikuTypeCount(mikuType)
+        @agents.map{|agent| agent.mikuTypeCount(mikuType)}.inject(0, :+)
+    end
+
+    def setAttribute2(uuid, attribute_name, value)
+        @agents.each{|agent| 
+            agent.setAttribute2(uuid, attribute_name, value)
+        }
+    end
+
+    def init(mikuType, uuid)
+        @agents.each{|agent| 
+            agent.init(mikuType, uuid)
+        }
+    end
+
+    def destroy(uuid)
+        @agents.each{|agent|
+            agent.destroy(uuid)
+        }
+    end
+end
+
+$SolingenManager = SolingenManager.new()
+
