@@ -262,8 +262,11 @@ class SolingenManager
             }
     end
 
-    def maintenance()
-        @agents.each{|agent| agent.maintenance()}
+    def maintenance(s)
+        @agents.each{|agent|
+            agent.maintenance()
+            sleep s
+        }
     end
 
     def getItems()
@@ -310,4 +313,12 @@ class SolingenManager
 end
 
 $SolingenManager = SolingenManager.new()
+
+Thread.new {
+    loop {
+        sleep 120
+        $SolingenManager.maintenance(1)
+    }
+}
+
 
