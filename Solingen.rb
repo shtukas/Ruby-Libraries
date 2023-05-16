@@ -238,6 +238,7 @@ class SolingenAgent
 
     def destroy(uuid)
         @items = @items.reject{|item| item["uuid"] == uuid }
+        commitItemsToCache(@items)
     end
 
     def setAttribute2(uuid, attribute_name, value)
@@ -247,6 +248,7 @@ class SolingenAgent
             end
             item
         }
+        commitItemsToCache(@items)
     end
 
     def init(mikuType, uuid)
