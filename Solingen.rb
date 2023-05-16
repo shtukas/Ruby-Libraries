@@ -152,7 +152,6 @@ class SolingenAgent
     # @foldertrace
 
     def initialize(code)
-        puts "Initializing agent #{code}"
         @code = code
         @folderpath = "#{Blades::bladeRepository()}/#{code}"
         @foldertrace = computeFolderTrace(@folderpath)
@@ -180,6 +179,11 @@ class SolingenAgent
                 end
 
                 XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}", filepath)
+
+                # If a merge happened, then the file could have been moved in another folder
+                # This implies that between two maintenance operations
+                #    - the same item could appear in two diffrent agents
+                #    - could also not be present anywhere
 
                 items << Solingen::getBladeAsItem(filepath)
             end
