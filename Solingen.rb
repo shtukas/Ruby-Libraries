@@ -154,11 +154,10 @@ class SolingenAgent
     def initialize(code)
         @code = code
         @folderpath = "#{Blades::bladeRepository()}/#{code}"
-        @foldertrace = computeFolderTrace(@folderpath)
-        @items = getItemsFromCacheOrNull()
-        if @items.nil? then
-            @items = getItemsFromDisk()
-            commitItemsToCache(@items)
+        @packet = getPacketFromCacheOrNull()
+        if @packet.nil? then
+            @packet = getPacketFromDisk()
+            commitPacketToCache(@packet)
         end
     end
 
@@ -192,17 +191,17 @@ class SolingenAgent
     end
 
     def getItems()
-        @items
+        @packet["items"]
     end
 
-    def commitItemsToCache(items)
-        XCache::set("ac22b4b9-3271-42cb-8e6d-c0b8817d73b9:#{@code}", JSON.generate(items))
+    def commitPacketToCache(packet)
+        XCache::set("0695fc74-095b-4dba-b9b8-e7cbea1bb1c1:#{@code}", JSON.generate(packet))
     end
 
-    def getItemsFromCacheOrNull()
-        items = XCache::getOrNull("ac22b4b9-3271-42cb-8e6d-c0b8817d73b9:#{@code}")
-        if items then
-            JSON.parse(items)
+    def getPacketFromCacheOrNull()
+        packet = XCache::getOrNull("0695fc74-095b-4dba-b9b8-e7cbea1bb1c1:#{@code}")
+        if packet then
+            JSON.parse(packet)
         else
             nil
         end
@@ -214,41 +213,47 @@ class SolingenAgent
             .reduce(folderpath){|trace, f| Digest::SHA1.hexdigest("#{trace}:#{f}")}
     end
 
-    def reloadItemsFromDisk()
-        @items = getItemsFromDisk()
-        @foldertrace = computeFolderTrace(@folderpath)
-        commitItemsToCache(@items)
+    def getPacketFromDisk()
+        {
+            "foldertrace" => computeFolderTrace(@folderpath),
+            "items" => getItemsFromDisk()
+        }
+    end
+
+    def cyclePacketFromDisk()
+        @packet = getPacketFromDisk()
+        commitPacketToCache(@packet)
     end
 
     def getItemOrNull(uuid)
-        @items.select{|item| item["uuid"] == uuid }.first
+        @packet["items"].select{|item| item["uuid"] == uuid }.first
     end
 
     def mikuTypes()
-        @items.map{|item| item["mikuType"]}.uniq
+        @packet["items"].map{|item| item["mikuType"]}.uniq
     end
 
     def mikuTypeItems(mikuType)
-        @items.select{|item| item["mikuType"] == mikuType }
+        @packet["items"].select{|item| item["mikuType"] == mikuType }
     end
 
     def mikuTypeCount(mikuType)
-        @items.select{|item| item["mikuType"] == mikuType }.size
+        @packet["items"].select{|item| item["mikuType"] == mikuType }.size
     end
 
     def destroy(uuid)
-        @items = @items.reject{|item| item["uuid"] == uuid }
-        commitItemsToCache(@items)
+        @packet["items"] = @packet["items"].reject{|item| item["uuid"] == uuid }
+        commitPacketToCache(@packet)
     end
 
     def setAttribute2(uuid, attribute_name, value)
-        @items = @items.map{ |item|
+        @packet["items"] = @packet["items"].map{ |item|
             if item["uuid"] == uuid then
                 item[attribute_name] = value
             end
             item
         }
-        commitItemsToCache(@items)
+        commitPacketToCache(@packet)
     end
 
     def init(mikuType, uuid)
@@ -256,8 +261,8 @@ class SolingenAgent
     end
 
     def maintenance()
-        if computeFolderTrace(@folderpath) != @foldertrace then
-            reloadItemsFromDisk()
+        if computeFolderTrace(@folderpath) != @packet["foldertrace"] then
+            cyclePacketFromDisk()
         end
     end
 end
@@ -323,7 +328,6 @@ class SolingenManager
 end
 
 $SolingenManager = SolingenManager.new()
-$SolingenManager.maintenance(0)
 
 Thread.new {
     loop {
