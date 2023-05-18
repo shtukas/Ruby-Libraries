@@ -323,6 +323,7 @@ class SolingenManager
 end
 
 $SolingenManager = SolingenManager.new()
+$SolingenManager.maintenance(0)
 
 Thread.new {
     loop {
