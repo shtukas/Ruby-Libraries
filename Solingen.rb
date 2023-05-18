@@ -159,6 +159,7 @@ class SolingenAgent
             @packet = getPacketFromDisk()
             commitPacketToCache(@packet)
         end
+        maintenance()
     end
 
     def getItemsFromDisk()
