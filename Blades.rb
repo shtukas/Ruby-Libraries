@@ -3,7 +3,7 @@
 =begin
 Blades
     Blades::filepathsEnumerator()
-    Blades::init(mikuType, uuid)
+    Blades::init(mikuType, uuid) # filepath
     Blades::uuidToFilepathOrNull(uuid)
     Blades::setAttribute1(filepath, attribute_name, value)
     Blades::setAttribute2(uuid, attribute_name, value)
@@ -44,31 +44,7 @@ require 'find'
 # -----------------------------------------------------------------------------------
 
 =begin
-
-A blade is a log of events in a sqlite file.
-It offers a key/value store interface and a set interface.
-
-create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)
-
-Conventions:
-    ----------------------------------------------------------------------------------
-    | operation_type     | meaning of _name_                | _data_ conventions     |
-    ----------------------------------------------------------------------------------
-    | "attribute"        | name of the attribute            | value is json encoded  |
-    | "set-add"          | expression <set_name>/<value_id> | value is json encoded  |
-    | "set-remove"       | expression <set_name>/<value_id> |                        |
-    | "datablob"         | key (for instance a nhash)       | blob                   |
-    ----------------------------------------------------------------------------------
-
-reserved attributes:
-    - uuid     : unique identifier of the blade.
-    - mikuType : String
-    - next     : (optional) uuid of the next blade in the sequence
-    - previous : (optional) uuid of the previous blade in the sequence (mostly for blade garbage collection)
-
-NxPure is a MikuType reserved for datablob-only carrying blades (essentially `next` blades)
-
-
+    For specifications see DataTypes/02-blades.txt
 =end
 
 class Blades
@@ -177,9 +153,6 @@ class Blades
 
     # Blades::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
-        if uuid.include?("@") then
-            raise "A blade uuid cannot have the chracter: @ (use as separator in the blade filenames)"
-        end
         filepath = "#{Blades::bladeRepository()}/blade-#{SecureRandom.hex}"
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
@@ -190,7 +163,6 @@ class Blades
         db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "attribute", "mikuType", JSON.generate(mikuType)]
         db.close
         Blades::rename(filepath)
-        nil
     end
 
     # Blades::setAttribute1(filepath, attribute_name, value)
@@ -223,7 +195,7 @@ class Blades
         db.busy_timeout = 117
         db.busy_handler { |count| true }
         db.results_as_hash = true
-        # We go through all the values, because the one we want is the last one
+        # We go through all the values in order, because the one we want is the last one
         db.execute("select * from records where operation_type=? and _name_=? order by operation_unixtime", ["attribute", attribute_name]) do |row|
             value = JSON.parse(row["_data_"])
         end
@@ -333,21 +305,48 @@ class Blades
 
     # Blades::putDatablob1(filepath, datablob) # nhash
     def self.putDatablob1(filepath, datablob)
-        DarkMatter::putBlob(datablob)
+        puts "Blades::putDatablob1(filepath: #{filepath}, datablob:size: #{datablob.size})".green
+        raise "(error: 8e21aacf-6d08-4d51-9f65-a7a2b963ca38) filepath: #{filepath}, datablob:size: #{datablob.size}" if !File.exist?(filepath)
+        nhash = "SHA256-#{Digest::SHA256.hexdigest(datablob)}"
+        db = SQLite3::Database.new(filepath)
+        db.busy_timeout = 117
+        db.busy_handler { |count| true }
+        db.results_as_hash = true
+        db.execute "insert into records (record_uuid, operation_unixtime, operation_type, _name_, _data_) values (?, ?, ?, ?, ?)", [SecureRandom.uuid, Time.new.to_f, "datablob", nhash, datablob]
+        db.close
+        Blades::rename(filepath)
+        nhash
     end
 
     # Blades::putDatablob2(uuid, datablob) # nhash
     def self.putDatablob2(uuid, datablob)
-        DarkMatter::putBlob(datablob)
+        filepath = Blades::uuidToFilepathOrNull(uuid)
+        raise "(error: 41b155f5-1114-4b2d-b2b8-c1230819fd3d) uuid: #{uuid}, datablob:size: #{datablob.size}" if filepath.nil?
+        if File.size(filepath) < 1024*1024*1024 then # 1Gb 
+            return Blades::putDatablob1(filepath, datablob)
+        end
+
+        nextuuid = Blades::getAttributeOrNull1(filepath, "next")
+        if nextuuid then
+            return Blades::putDatablob2(nextuuid, datablob)
+        end
+
+        nextuuid = SecureRandom.uuid
+        nextfilepath = Blades::init("NxPure", nextuuid)
+
+        Blades::setAttribute1(nextfilepath, "previous", uuid) # marking the next blade with coordinates of the current
+        Blades::setAttribute1(filepath, "next", nextuuid)     # marking the current blade with coordinates of the next
+
+        Blades::putDatablob1(nextfilepath, datablob)
     end
 
     # Blades::getDatablobOrNull1(filepath, nhash)
     def self.getDatablobOrNull1(filepath, nhash)
-        blob = DarkMatter::getBlobOrNull(nhash)
-        return blob if blob
 
         raise "(error: 273139ba-e4ef-4345-a4de-2594ce77c563) filepath: #{filepath}" if !File.exist?(filepath)
+
         datablob = nil
+
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
         db.busy_handler { |count| true }
@@ -357,21 +356,15 @@ class Blades
         end
         db.close
 
-        if datablob.nil? then
-            # If we did not find a blob, it could be that the blob is at next.
-            # Let's try that!
-            nextuuid = Blades::getAttributeOrNull1(filepath, "next")
-            if nextuuid then
-                datablob = Blades::getDatablobOrNull2(nextuuid, nhash)
-                if datablob then
-                    DarkMatter::putBlob(datablob)
-                    return datablob # 🎉
-                end
-            end
-        end
+        return datablob if datablob
 
-        DarkMatter::putBlob(datablob)
-        datablob
+        # If we did not find a blob, it could be that the blob is at next.
+        # Let's try that!
+
+        nextuuid = Blades::getAttributeOrNull1(filepath, "next")
+        return nil if nextuuid.nil?
+
+        Blades::getDatablobOrNull2(nextuuid, nhash)
     end
 
     # Blades::getDatablobOrNull2(uuid, nhash)
@@ -396,7 +389,7 @@ class BladeElizabeth
     end
 
     def putBlob(datablob) # nhash
-        DarkMatter::putBlob(datablob)
+        Blades::putDatablob2(@uuid, datablob)
     end
 
     def filepathToContentHash(filepath)
