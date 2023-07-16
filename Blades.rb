@@ -5,17 +5,11 @@ Blades
     Blades::filepathsEnumerator()
     Blades::init(mikuType, uuid) # String : filepath
     Blades::uuidToFilepathOrNull(uuid)
-    Blades::setAttribute1(filepath, attribute_name, value)
     Blades::setAttribute2(uuid, attribute_name, value)
-    Blades::getAttributeOrNull1(filepath, attribute_name)
     Blades::getAttributeOrNull2(uuid, attribute_name)
-    Blades::getMandatoryAttribute1(filepath, attribute_name)
     Blades::getMandatoryAttribute2(uuid, attribute_name)
-    Blades::addToSet1(filepath, set_name, value_id, value)
     Blades::addToSet2(uuid, set_name, value_id, value)
-    Blades::removeFromSet1(filpath, set_name, value_id)
     Blades::removeFromSet2(uuid, set_name, value_id)
-    Blades::putDatablob1(filepath, key, datablob)
     Blades::getDatablobOrNull1(filepath, key)
     Blades::destroy(uuid)
 =end
