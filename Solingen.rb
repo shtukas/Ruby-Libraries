@@ -38,8 +38,10 @@ class Solingen
         "#{ENV["HOME"]}/Galaxy/DataHub/Solingen"
     end
 
-    # Solingen::mikuTypeUUIDs()
-    def self.mikuTypeUUIDs()
-        
+    # Solingen::mikuTypeUUIDs(mikuType)
+    def self.mikuTypeUUIDs(mikuType)
+        Blades::filepathsEnumerator()
+            .select{|filepath| Blades::getAttributeOrNull1(filepath, "mikuType") == mikuType }
+            .map{|filepath| Blades::getAttributeOrNull1(filepath, "uuid") }
     end
 end

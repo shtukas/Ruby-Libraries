@@ -171,9 +171,7 @@ class Blades
 
     # Blades::init(mikuType, uuid) # String : filepath
     def self.init(mikuType, uuid)
-        if uuid.include?("@") then
-            raise "A blade uuid cannot have the chracter: @ (use as separator in the blade filenames)"
-        end
+        puts "Blades::init(mikuType: #{mikuType}, uuid: #{uuid})".green
         filepath = "#{Blades::bladeRepository()}/blade-#{SecureRandom.hex}"
         db = SQLite3::Database.new(filepath)
         db.busy_timeout = 117
