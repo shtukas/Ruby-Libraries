@@ -33,89 +33,100 @@ require_relative "Blades.rb"
 
 # create table energy (uuid string primary key, mikuType string, item string);
 
+$Items3A21470B42A7 = nil
+
+class BladesGx
+
+    # BladesGx::scan_merge()
+    def self.scan_merge()
+        mapping = {} # uuid => Array[filepath]
+
+        filepaths = Blades::filepathsEnumerator().to_a
+
+        filepaths.each{|filepath|
+            uuid = Blades::getMandatoryAttribute1(filepath, "uuid")
+            if mapping[uuid].nil? then
+                mapping[uuid] = []
+            end
+            mapping[uuid] = (mapping[uuid] + [filepath]).uniq
+        }
+
+        mapping.values.select{|l| l.size > 1 }.each{|l|
+            puts JSON.pretty_generate(l)
+            l.reduce(l.first){|filepath1, filepath2|
+                if filepath1 == filepath2 then
+                    filepath1
+                else
+                    Blades::merge(filepath1, filepath2)
+                end
+            }
+        }
+
+        puts "operation completed with #{filepaths.size} blades"
+    end
+
+    # BladesGx::ensureInMemoryData()
+    def self.ensureInMemoryData()
+        return if !$Items3A21470B42A7.nil?
+        puts "BladesGx::ensureInMemoryData()"
+        $Items3A21470B42A7 = Blades::filepathsEnumerator().map{|filepath| BladeUtils::itemOrNull1(filepath) }
+    end
+end
+
 class BladesGI
 
     # BladesGI::itemOrNull(uuid)
     def self.itemOrNull(uuid)
-        BladeUtils::itemOrNull2(uuid)
+        # Without caching
+        # BladeUtils::itemOrNull2(uuid)
+    
+        # With caching
+        BladesGx::ensureInMemoryData()
+        item = $Items3A21470B42A7.select{|item| item["uuid"] == uuid }.first
+        return nil if item.nil?
+        item.clone
     end
 
     # BladesGI::init(mikuType, uuid)
     def self.init(mikuType, uuid)
         Blades::init(mikuType, uuid)
+
+        BladesGx::ensureInMemoryData()
+        item = BladesGI::itemOrNull(uuid)
+        $Items3A21470B42A7 << item
     end
 
     # BladesGI::setAttribute2(uuid, attribute_name, value)
     def self.setAttribute2(uuid, attribute_name, value)
         Blades::setAttribute2(uuid, attribute_name, value)
+
+        BladesGx::ensureInMemoryData()
+        $Items3A21470B42A7 = $Items3A21470B42A7.map{|item|
+            if item["uuid"] == uuid then
+                item[attribute_name] = value
+            end
+            item
+        }
     end
 
     # BladesGI::destroy(uuid)
     def self.destroy(uuid)
         Blades::destroy(uuid)
+
+        BladesGx::ensureInMemoryData()
+        $Items3A21470B42A7 = $Items3A21470B42A7.select{|item| item["uuid"] != uuid }
     end
 
     # BladesGI::mikuType(mikuType)
     def self.mikuType(mikuType)
-
-        # Before being returned to the called as an array of items a mikuType is an object in the XCache of the form
-        # MikuType {
-        #     "items"      => Array[Item]
-        #     "expiration" => Integer
-        #     "filepaths"  => Array[filepath]
-        # }
-
-        buildStructure = lambda {|mikuType|
-            puts "building a new structure for #{mikuType}"
-            items = []
-            filepaths = []
-            Blades::filepathsEnumerator().each{|filepath|
-                item = BladeUtils::itemOrNull1(filepath)
-                next if item.nil?
-                if item["mikuType"] == mikuType then
-                    items << item
-                    filepaths << filepath
-                end
-            }
-            {
-                "items"      => items,
-                "expiration" => Time.new.to_i + 86400,
-                "filepaths"  => filepaths
-            }
-        }
-
-        isValid = lambda {|structure|
-            return false if (Time.new.to_i > structure["expiration"])
-            return false if structure["filepaths"].any?{|filepath| !File.exist?(filepath) }
-            true
-        }
-
-        key = "9e9134f6-d7b2-48db-84df-2eef84496453:#{mikuType}"
-        structure = XCache::getOrNull(key)
-
-        if structure.nil? then
-            structure = buildStructure.call(mikuType)
-            XCache::set(key, JSON.generate(structure))
-            return structure["items"]
-        end
-
-        structure = JSON.parse(structure)
-
-        if isValid.call(structure) then
-            return structure["items"]
-        end
-
-        structure = buildStructure.call(mikuType)
-        XCache::set(key, JSON.generate(structure))
-        structure["items"]
+        BladesGx::ensureInMemoryData()
+        $Items3A21470B42A7.select{|item| item["mikuType"] == mikuType }.map{|item| item.clone }
     end
 
     # BladesGI::all()
     def self.all()
-        Blades::filepathsEnumerator()
-        .to_a
-        .map{|filepath| BladeUtils::itemOrNull1(filepath) }
-        .compact
+        BladesGx::ensureInMemoryData()
+        $Items3A21470B42A7.map{|item| item.clone }
     end
 
     # BladesGI::putDatablob2(uuid, datablob)
@@ -123,4 +134,3 @@ class BladesGI
         Blades::putDatablob2(uuid, datablob)
     end
 end
-
