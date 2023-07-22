@@ -56,7 +56,7 @@ class CoreDataRefsNxCDRs
             description = description.size > 0 ? description : nil
             location = CommonUtils::interactivelySelectDesktopLocationOrNull()
             return nil if location.nil?
-            nhash = AionCore::commitLocationReturnHash(DarkMatterElizabeth.new(uuid), location)
+            nhash = AionCore::commitLocationReturnHash(BladeElizabeth.new(uuid), location)
             return {
                 "uuid"        => SecureRandom.uuid,
                 "mikuType"    => "NxCoreDataRef",
@@ -164,7 +164,7 @@ class CoreDataRefsNxCDRs
             exportFoldername = "aion-point-#{exportId}"
             exportFolder = "#{Config::userHomeDirectory()}/Desktop/#{exportFoldername}"
             FileUtils.mkdir(exportFolder)
-            AionCore::exportHashAtFolder(DarkMatterElizabeth.new(uuid), nhash, exportFolder)
+            AionCore::exportHashAtFolder(BladeElizabeth.new(uuid), nhash, exportFolder)
             LucilleCore::pressEnterToContinue()
             return
         end
@@ -226,7 +226,7 @@ class CoreDataRefsNxCDRs
         end
         if reference["type"] == "aion-point" then
             nhash = reference["nhash"]
-            AionFsck::structureCheckAionHashRaiseErrorIfAny(DarkMatterElizabeth.new(uuid), nhash)
+            AionFsck::structureCheckAionHashRaiseErrorIfAny(BladeElizabeth.new(uuid), nhash)
             return
         end
         if reference["type"] == "unique-string" then

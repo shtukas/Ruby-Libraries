@@ -92,7 +92,7 @@ class BladesGI
         Blades::init(mikuType, uuid)
 
         BladesGx::ensureInMemoryData()
-        item = BladesGI::itemOrNull(uuid)
+        item = BladeUtils::itemOrNull2(uuid)
         $Items3A21470B42A7 << item
     end
 

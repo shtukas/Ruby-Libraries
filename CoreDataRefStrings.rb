@@ -19,7 +19,7 @@ class CoreDataRefStrings
         if !File.exist?(location) then
             raise "(error: c1d975c5-8d18-4f28-abde-9a32869af017) CoreDataRefStrings::locationToAionPointCoreDataReference, location: '#{location}' does not exist."
         end
-        nhash = AionCore::commitLocationReturnHash(DarkMatterElizabeth.new(uuid), location)
+        nhash = AionCore::commitLocationReturnHash(BladeElizabeth.new(uuid), location)
         "aion-point:#{nhash}"
     end
 
@@ -33,12 +33,12 @@ class CoreDataRefStrings
         end
         if referencetype == "text" then
             text = CommonUtils::editTextSynchronously("")
-            nhash = DarkMatter::putBlob(text)
+            nhash = Blades::putDatablob2(uuid, text)
             return "text:#{nhash}"
         end
         if referencetype == "url" then
             url = LucilleCore::askQuestionAnswerAsString("url: ")
-            nhash = DarkMatter::putBlob(url)
+            nhash = Blades::putDatablob2(uuid, url)
             return "url:#{nhash}"
         end
         if referencetype == "aion point" then
@@ -117,7 +117,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("text") then
             nhash = referenceString.split(":")[1]
-            text = DarkMatter::getBlobOrNull(nhash)
+            text = Blades::getDatablobOrNull2(uuid, nhash)
             puts "--------------------------------------------------------------"
             puts text
             puts "--------------------------------------------------------------"
@@ -126,7 +126,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("url") then
             nhash = referenceString.split(":")[1]
-            url = DarkMatter::getBlobOrNull(nhash)
+            url = Blades::getDatablobOrNull2(uuid, nhash)
             if url.nil? then
                 puts "(error) I could not retrieve url for reference string: #{referenceString}"
                 LucilleCore::pressEnterToContinue()
@@ -144,7 +144,7 @@ class CoreDataRefStrings
             exportFoldername = "aion-point-#{exportId}"
             exportFolder = "#{Config::pathToDesktop()}/#{exportFoldername}"
             FileUtils.mkdir(exportFolder)
-            AionCore::exportHashAtFolder(DarkMatterElizabeth.new(uuid), nhash, exportFolder)
+            AionCore::exportHashAtFolder(BladeElizabeth.new(uuid), nhash, exportFolder)
             LucilleCore::pressEnterToContinue()
             return
         end
@@ -185,7 +185,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("text") then
             nhash = referenceString.split(":")[1]
-            text = DarkMatterElizabeth.new(uuid).getBlobOrNull(nhash)
+            text = BladeElizabeth.new(uuid).getBlobOrNull(nhash)
             if text.nil? then
                 raise "CoreDataRefStrings::fsck: could not extract text for uuid: #{uuid}, reference string: #{referenceString}"
             end
@@ -193,7 +193,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("url") then
             nhash = referenceString.split(":")[1]
-            url = DarkMatterElizabeth.new(uuid).getBlobOrNull(nhash)
+            url = BladeElizabeth.new(uuid).getBlobOrNull(nhash)
             if url.nil? then
                 raise "CoreDataRefStrings::fsck: could not extract url for uuid: #{uuid}, reference string: #{referenceString}"
             end
@@ -201,7 +201,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("aion-point") then
             nhash = referenceString.split(":")[1]
-            AionFsck::structureCheckAionHashRaiseErrorIfAny(DarkMatterElizabeth.new(uuid), nhash)
+            AionFsck::structureCheckAionHashRaiseErrorIfAny(BladeElizabeth.new(uuid), nhash)
             return
         end
         if referenceString.start_with?("open-cycle") then
