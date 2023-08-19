@@ -158,7 +158,7 @@ class Cub3sX
             parentdirectory = "#{Cub3sX::pathToGalaxy()}/DataHub/Cubes/#{SecureRandom.hex[0, 2]}"
         end
         filepath = "#{parentdirectory}/#{SecureRandom.hex}-#{SecureRandom.hex[0, 6]}.cub3x"
-        if !File.exists?(parentdirectory) then
+        if !File.exist?(parentdirectory) then
             FileUtils.mkdir(parentdirectory)
         end
         db = SQLite3::Database.new(filepath)
