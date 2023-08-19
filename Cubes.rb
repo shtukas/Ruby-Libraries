@@ -565,9 +565,9 @@ class Cubes
         CUtils3X::itemOrNull2(uuid)
     end
 
-    # Cubes::init(mikuType, uuid)
-    def self.init(mikuType, uuid)
-        Cub3sX::init(mikuType, uuid)
+    # Cubes::init(parentdirectory, mikuType, uuid)
+    def self.init(parentdirectory, mikuType, uuid)
+        Cub3sX::init(parentdirectory, mikuType, uuid)
     end
 
     # Cubes::setAttribute2(uuid, attribute_name, value)
