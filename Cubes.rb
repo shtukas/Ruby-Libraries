@@ -137,19 +137,24 @@ class Cub3sX
     # Cub3sX::readFileAndUpdateItsMikuType1(filepath)
     def self.readFileAndUpdateItsMikuType1(filepath)
         mikuType = Cub3sX::getMandatoryAttribute1(filepath, "mikuType")
-        data = XCache::getOrNull("05a89235-c6e2-476e-b33d-d50e1762cd8b:#{mikuType}")
+        data = XCache::getOrNull("05a89235-c6e2-476e-b33d-d50e1762cd8c:#{mikuType}")
         if data then
             data = JSON.parse(data)
         else
             data = {
-                "key"       => SecureRandom.hex,
-                "filepaths" => []
+                "key"                    => SecureRandom.hex,
+                "lastFilepathsPrunning"  => 0,
+                "filepaths"              => []
             }
         end
         return if data["filepaths"].include?(filepath)
-        data["filepaths"] = data["filepaths"].select{|fp| File.exist?(fp) } + [filepath]
+        data["filepaths"] << filepath
+        if (Time.new.to_i - data["lastFilepathsPrunning"]) > 86400 then
+            data["filepaths"] = data["filepaths"].select{|fp| File.exist?(fp) }
+            data["lastFilepathsPrunning"] = Time.new.to_i
+        end
         data["key"] = SecureRandom.hex
-        XCache::set("05a89235-c6e2-476e-b33d-d50e1762cd8b:#{mikuType}", JSON.generate(data))
+        XCache::set("05a89235-c6e2-476e-b33d-d50e1762cd8c:#{mikuType}", JSON.generate(data))
     end
 
     # Cub3sX::rename(filepath1) # new filepath
@@ -602,7 +607,7 @@ class Cubes
 
     # Cubes::mikuType(mikuType)
     def self.mikuType(mikuType)
-        data = XCache::getOrNull("05a89235-c6e2-476e-b33d-d50e1762cd8b:#{mikuType}")
+        data = XCache::getOrNull("05a89235-c6e2-476e-b33d-d50e1762cd8c:#{mikuType}")
         return [] if data.nil?
         data = JSON.parse(data)
         items = XCache::getOrNull(data["key"])
