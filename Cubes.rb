@@ -132,7 +132,12 @@ class Cub3sX
         raise "(error: da2fb2ae-a50e-4359-b453-8bc4f856571a) filepath: #{filepath1}" if !File.exist?(filepath1)
         hash1 = Digest::SHA1.file(filepath1).hexdigest
         filepath2 = Cub3sX::newFilepath(filepath1, hash1)
-        return filepath1 if filepath1 == filepath2
+        if filepath1 == filepath2 then
+            uuidx = Cub3sX::getMandatoryAttribute1(filepath1, "uuid")
+            XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath1)
+            Cub3sX::readFileAndUpdateItsMikuType1(filepath1)
+            return filepath1
+        end
         if !File.exist?(File.dirname(filepath2)) then
             FileUtils.mkdir(File.dirname(filepath2))
         end
