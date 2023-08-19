@@ -121,6 +121,12 @@ class CoreDataRefStrings
             puts "--------------------------------------------------------------"
             puts text
             puts "--------------------------------------------------------------"
+            if LucilleCore::askQuestionAnswerAsBoolean("edit ? ") then
+                text = CommonUtils::editTextSynchronously(text)
+                nhash = Blades::putDatablob2(uuid, text)
+                refstr = "text:#{nhash}"
+                BladesGI::setAttribute2(uuid, "field11", refstr)
+            end
             LucilleCore::pressEnterToContinue()
             return
         end
@@ -142,15 +148,16 @@ class CoreDataRefStrings
             puts "CoreData, accessing aion point: #{nhash}"
             exportId = SecureRandom.hex(4)
             exportFoldername = "aion-point-#{exportId}"
-            exportFolder = "#{Config::pathToDesktop()}/#{exportFoldername}"
-            FileUtils.mkdir(exportFolder)
+            exportFolder = "#{ENV['HOME']}/x-space/xcache-v1-days/#{Time.new.to_s[0, 10]}/#{exportFoldername}"
+            FileUtils.mkpath(exportFolder)
             AionCore::exportHashAtFolder(BladeElizabeth.new(uuid), nhash, exportFolder)
+            system("open '#{exportFolder}'")
             LucilleCore::pressEnterToContinue()
             return
         end
         if referenceString.start_with?("open-cycle") then
             fname = referenceString.split(":")[1]
-            directoryFilepath = "#{Config::pathToGalaxy()}/OpenCycles/#{fname}"
+            directoryFilepath = "#{ENV['HOME']}/Galaxy/OpenCycles/#{fname}"
             system("open '#{directoryFilepath}'")
             return
         end
