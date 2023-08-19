@@ -49,41 +49,11 @@ require_relative "#{ENV['HOME']}/Galaxy/DataHub/Lucille-Ruby-Libraries/XCache.rb
 
 # -----------------------------------------------------------------------------------
 
-=begin
-
-A blade is a log of events in a sqlite file.
-It offers a key/value store interface and a set interface.
-
-create table records (record_uuid string primary key, operation_unixtime float, operation_type string, _name_ string, _data_ blob)
-
-Conventions:
-    ----------------------------------------------------------------------------------
-    | operation_type     | meaning of _name_                | _data_ conventions     |
-    ----------------------------------------------------------------------------------
-    | "attribute"        | name of the attribute            | value is json encoded  |
-    | "set-add"          | expression <set_name>/<value_id> | value is json encoded  |
-    | "set-remove"       | expression <set_name>/<value_id> |                        |
-    | "datablob"         | key (for instance a nhash)       | blob                   |
-    ----------------------------------------------------------------------------------
-
-reserved attributes:
-    - uuid     : unique identifier of the blade.
-    - mikuType : String
-    - next     : (optional) uuid of the next blade in the sequence
-    - previous : (optional) uuid of the previous blade in the sequence (mostly for blade garbage collection)
-
-NxPure is a MikuType reserved for datablob-only carrying blades (essentially `next` blades)
-
-
-=end
-
 class Cub3sX
 
-    # Cub3sX::isBlade(filepath) # boolean
-    def self.isBlade(filepath)
-        b1 = (File.basename(filepath).start_with?("blade-") and File.basename(filepath).size == "blade-fff25e1d96b080d3bb8adf47f8a7e99002079837".size )
-        b2 = (File.basename(filepath)[-6, 6] == ".cub3x")
-        b1 or b2
+    # Cub3sX::isCube(filepath) # boolean
+    def self.isCube(filepath)
+        File.basename(filepath)[-6, 6] == ".cub3x"
     end
 
     # Cub3sX::pathToGalaxy()
@@ -97,7 +67,7 @@ class Cub3sX
            begin
                 Find.find(Cub3sX::pathToGalaxy()) do |path|
                     next if !File.file?(path)
-                    if Cub3sX::isBlade(path) then
+                    if Cub3sX::isCube(path) then
                         filepaths << path
                     end
                 end
@@ -114,11 +84,11 @@ class Cub3sX
 
         # Got nothing from the uuid -> filepath mapping
         # Running exhaustive search.
-        puts "Running exhaustive search to find blade filepath for uuid: #{uuid}"
+        puts "Running exhaustive search to find cube filepath for uuid: #{uuid}"
 
         Find.find(Cub3sX::pathToGalaxy()) do |filepath|
             next if !File.file?(filepath)
-            next if !Cub3sX::isBlade(filepath)
+            next if !Cub3sX::isCube(filepath)
             uuidx = Cub3sX::getMandatoryAttribute1(filepath, "uuid")
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath)
             return filepath if uuidx == uuid
@@ -294,7 +264,7 @@ class Cub3sX
     def self.getMandatoryAttribute1(filepath, attribute_name)
         value = Cub3sX::getAttributeOrNull1(filepath, attribute_name)
         if value.nil? then
-            raise "(error: f6d8c9d9-84cb-4f14-95c2-402d2471ef93) Failing mandatory attribute '#{attribute_name}' at blade '#{filepath}'"
+            raise "(error: f6d8c9d9-84cb-4f14-95c2-402d2471ef93) Failing mandatory attribute '#{attribute_name}' at cube '#{filepath}'"
         end
         value
     end
