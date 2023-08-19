@@ -82,6 +82,19 @@ class Cub3sX
         filepath = XCache::getOrNull("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuid}")
         return filepath if (filepath and File.exist?(filepath))
 
+        # It could be that the file was renamed in its directory, let's search there
+        if filepath and File.exist?(File.dirname(filepath)) then
+            directory = File.dirname(filepath)
+            puts "Running local search to find cube filepath for uuid: #{uuid}"
+            Find.find(directory) do |filepath|
+                next if !File.file?(filepath)
+                next if !Cub3sX::isCube(filepath)
+                uuidx = Cub3sX::getMandatoryAttribute1(filepath, "uuid")
+                XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath)
+                return filepath if uuidx == uuid
+            end
+        end
+
         # Got nothing from the uuid -> filepath mapping
         # Running exhaustive search.
         puts "Running exhaustive search to find cube filepath for uuid: #{uuid}"
