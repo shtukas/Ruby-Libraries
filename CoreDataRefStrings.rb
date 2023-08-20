@@ -19,7 +19,7 @@ class CoreDataRefStrings
         if !File.exist?(location) then
             raise "(error: c1d975c5-8d18-4f28-abde-9a32869af017) CoreDataRefStrings::locationToAionPointCoreDataReference, location: '#{location}' does not exist."
         end
-        nhash = AionCore::commitLocationReturnHash(BladeElizabeth.new(uuid), location)
+        nhash = AionCore::commitLocationReturnHash(C3xElizabeth.new(uuid), location)
         "aion-point:#{nhash}"
     end
 
@@ -150,7 +150,7 @@ class CoreDataRefStrings
             exportFoldername = "aion-point-#{exportId}"
             exportFolder = "#{ENV['HOME']}/x-space/xcache-v1-days/#{Time.new.to_s[0, 10]}/#{exportFoldername}"
             FileUtils.mkpath(exportFolder)
-            AionCore::exportHashAtFolder(BladeElizabeth.new(uuid), nhash, exportFolder)
+            AionCore::exportHashAtFolder(C3xElizabeth.new(uuid), nhash, exportFolder)
             system("open '#{exportFolder}'")
             LucilleCore::pressEnterToContinue()
             return
@@ -192,7 +192,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("text") then
             nhash = referenceString.split(":")[1]
-            text = BladeElizabeth.new(uuid).getBlobOrNull(nhash)
+            text = C3xElizabeth.new(uuid).getBlobOrNull(nhash)
             if text.nil? then
                 raise "CoreDataRefStrings::fsck: could not extract text for uuid: #{uuid}, reference string: #{referenceString}"
             end
@@ -200,7 +200,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("url") then
             nhash = referenceString.split(":")[1]
-            url = BladeElizabeth.new(uuid).getBlobOrNull(nhash)
+            url = C3xElizabeth.new(uuid).getBlobOrNull(nhash)
             if url.nil? then
                 raise "CoreDataRefStrings::fsck: could not extract url for uuid: #{uuid}, reference string: #{referenceString}"
             end
@@ -208,7 +208,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("aion-point") then
             nhash = referenceString.split(":")[1]
-            AionFsck::structureCheckAionHashRaiseErrorIfAny(BladeElizabeth.new(uuid), nhash)
+            AionFsck::structureCheckAionHashRaiseErrorIfAny(C3xElizabeth.new(uuid), nhash)
             return
         end
         if referenceString.start_with?("open-cycle") then

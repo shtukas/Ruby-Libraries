@@ -117,27 +117,45 @@ class Cub3sX
         "#{dirname}/#{basename[0, basename.length-13]}-#{hash1[0, 6]}.cub3x"
     end
 
-    # Cub3sX::readFileAndUpdateItsMikuType1(filepath)
-    def self.readFileAndUpdateItsMikuType1(filepath)
+    # Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath)
+    def self.readFileAndUpdateItsMikuTypeCachedData1(filepath)
         mikuType = Cub3sX::getMandatoryAttribute1(filepath, "mikuType")
-        data = XCache::getOrNull("05a89235-c6e2-476e-b33d-d50e1762cd8c:#{mikuType}")
+        data = XCache::getOrNull("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}")
         if data then
             data = JSON.parse(data)
         else
             data = {
-                "key"                    => SecureRandom.hex,
-                "lastFilepathsPrunning"  => 0,
-                "filepaths"              => []
+                "lastPrunningTime" => 0,
+                "entries"          => [], # Array[{uuid, filepath, item}]
             }
         end
-        return if data["filepaths"].include?(filepath)
-        data["filepaths"] << filepath
-        if (Time.new.to_i - data["lastFilepathsPrunning"]) > 86400 then
-            data["filepaths"] = data["filepaths"].select{|fp| File.exist?(fp) }
-            data["lastFilepathsPrunning"] = Time.new.to_i
+        return if data["entries"].map{|entry| entry["filepath"] }.include?(filepath)
+        item = CUtils3X::itemOrNull1(filepath)
+        XCache::set("cubes:uuid->mikutype:9709-7de503400fef:#{item["uuid"]}", item["mikuType"])
+        entry = {
+            "filepath" => filepath,
+            "item"     => item
+        }
+        data["entries"] = data["entries"].select{|entry| entry["item"]["uuid"] != item["uuid"] }
+        data["entries"] << entry
+        if (Time.new.to_i - data["lastPrunningTime"]) > 3600 then
+            data["entries"] = data["entries"].select{|entry| File.exist?(entry["filepath"]) }
+            data["lastPrunningTime"] = Time.new.to_i
         end
-        data["key"] = SecureRandom.hex
-        XCache::set("05a89235-c6e2-476e-b33d-d50e1762cd8c:#{mikuType}", JSON.generate(data))
+        XCache::set("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}", JSON.generate(data))
+    end
+
+    # Cub3sX::itemHasBeenDestroyedMikuTypeDataUpdate2(uuid)
+    def self.itemHasBeenDestroyedMikuTypeDataUpdate2(uuid)
+        mikuType = XCache::getOrNull("cubes:uuid->mikutype:9709-7de503400fef:#{uuid}")
+        return if mikuType.nil?
+        data = XCache::getOrNull("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}")
+        return if data.nil?
+        data = JSON.parse(data)
+        data["entries"] = data["entries"].select{|entry| entry["item"]["uuid"] != uuid }
+        data["entries"] = data["entries"].select{|entry| File.exist?(entry["filepath"]) }
+        data["lastPrunningTime"] = Time.new.to_i
+        XCache::set("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}", JSON.generate(data))
     end
 
     # Cub3sX::rename(filepath1) # new filepath
@@ -148,7 +166,7 @@ class Cub3sX
         if filepath1 == filepath2 then
             uuidx = Cub3sX::getMandatoryAttribute1(filepath1, "uuid")
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath1)
-            Cub3sX::readFileAndUpdateItsMikuType1(filepath1)
+            Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath1)
             return filepath1
         end
         if !File.exist?(File.dirname(filepath2)) then
@@ -160,7 +178,7 @@ class Cub3sX
         FileUtils.mv(filepath1, filepath2)
         uuidx = Cub3sX::getMandatoryAttribute1(filepath2, "uuid")
         XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath2)
-        Cub3sX::readFileAndUpdateItsMikuType1(filepath2)
+        Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath2)
         filepath2
     end
 
@@ -464,8 +482,11 @@ class Cub3sX
     # Cub3sX::destroy(uuid)
     def self.destroy(uuid)
         filepath = Cub3sX::uuidToFilepathOrNull(uuid)
-        return if filepath.nil?
-        FileUtils.rm(filepath)
+        if filepath then
+            puts "> deleting file: #{filepath}"
+            FileUtils.rm(filepath)
+        end
+        Cub3sX::itemHasBeenDestroyedMikuTypeDataUpdate2(uuid)
     end
 end
 
@@ -542,13 +563,19 @@ class CUtils3X
         filepaths
             .each{|filepath|
                 puts filepath if verbose
-                Cub3sX::readFileAndUpdateItsMikuType1(filepath)
+                Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath)
             }
     end
 
     # CUtils3X::itemOrNull1(filepath)
     def self.itemOrNull1(filepath)
         raise "(error: f14287d8-a023-42fc-9cbb-9222bdfae30c) filepath does not exist" if !File.exist?(filepath)
+
+        item = XCache::getOrNull("803c65a7-9c8d-4544-b1eb-b4cc20f7187c:#{filepath}")
+        if item then
+            return JSON.parse(item)
+        end
+
         item = {}
 
         db = SQLite3::Database.new(filepath)
@@ -559,6 +586,8 @@ class CUtils3X
             item[row["_name1_"]] = JSON.parse(row["_data_"])
         end
         db.close
+
+        XCache::set("803c65a7-9c8d-4544-b1eb-b4cc20f7187c:#{filepath}", JSON.generate(item))
 
         item
     end
@@ -595,16 +624,10 @@ class Cubes
 
     # Cubes::mikuType(mikuType)
     def self.mikuType(mikuType)
-        data = XCache::getOrNull("05a89235-c6e2-476e-b33d-d50e1762cd8c:#{mikuType}")
+        data = XCache::getOrNull("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}")
         return [] if data.nil?
         data = JSON.parse(data)
-        items = XCache::getOrNull(data["key"])
-        if items then
-            return JSON.parse(items)
-        end
-        items = data["filepaths"].map{|filepath| File.exist?(filepath) ? CUtils3X::itemOrNull1(filepath) : nil }.compact
-        XCache::set(data["key"], JSON.generate(items))
-        items
+        data["entries"].map{|entry| entry["item"] }
     end
 
     # Cubes::putDatablob2(uuid, datablob)
