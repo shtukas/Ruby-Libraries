@@ -592,6 +592,7 @@ class CUtils3X
     def self.itemOrNull2(uuid)
         filepath = Cub3sX::uuidToFilepathOrNull(uuid)
         return nil if filepath.nil?
+        Cub3sX::readFileAndUpdateCachedData1(filepath)
         CUtils3X::itemOrNull1(filepath)
     end
 end
