@@ -117,8 +117,8 @@ class Cub3sX
         "#{dirname}/#{basename[0, basename.length-13]}-#{hash1[0, 6]}.cub3x"
     end
 
-    # Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath)
-    def self.readFileAndUpdateItsMikuTypeCachedData1(filepath)
+    # Cub3sX::readFileAndUpdateCachedData1(filepath)
+    def self.readFileAndUpdateCachedData1(filepath)
         return if !File.exist?(filepath)
         mikuType = Cub3sX::getMandatoryAttribute1(filepath, "mikuType")
         data = XCache::getOrNull("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}")
@@ -132,7 +132,6 @@ class Cub3sX
         end
         return if data["entries"].map{|entry| entry["filepath"] }.include?(filepath)
         item = CUtils3X::itemOrNull1(filepath)
-        XCache::set("cubes:uuid->mikutype:9709-7de503400fef:#{item["uuid"]}", item["mikuType"])
         entry = {
             "filepath" => filepath,
             "item"     => item
@@ -167,7 +166,7 @@ class Cub3sX
         if filepath1 == filepath2 then
             uuidx = Cub3sX::getMandatoryAttribute1(filepath1, "uuid")
             XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath1)
-            Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath1)
+            Cub3sX::readFileAndUpdateCachedData1(filepath1)
             return filepath1
         end
         if !File.exist?(File.dirname(filepath2)) then
@@ -179,7 +178,7 @@ class Cub3sX
         FileUtils.mv(filepath1, filepath2)
         uuidx = Cub3sX::getMandatoryAttribute1(filepath2, "uuid")
         XCache::set("blades:uuid->filepath:mapping:7239cf3f7b6d:#{uuidx}", filepath2)
-        Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath2)
+        Cub3sX::readFileAndUpdateCachedData1(filepath2)
         filepath2
     end
 
@@ -564,7 +563,7 @@ class CUtils3X
         filepaths
             .each{|filepath|
                 puts filepath if verbose
-                Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath)
+                Cub3sX::readFileAndUpdateCachedData1(filepath)
             }
     end
 
@@ -628,7 +627,9 @@ class Cubes
         data = XCache::getOrNull("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}")
         return [] if data.nil?
         data = JSON.parse(data)
-        data["entries"].map{|entry| entry["item"] }
+        data["entries"]
+            .select{|entry| File.exist?(entry["filepath"]) }
+            .map{|entry| entry["item"] }
     end
 
     # Cubes::putDatablob2(uuid, datablob)
