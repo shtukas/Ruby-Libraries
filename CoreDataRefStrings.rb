@@ -33,12 +33,12 @@ class CoreDataRefStrings
         end
         if referencetype == "text" then
             text = CommonUtils::editTextSynchronously("")
-            nhash = Blades::putDatablob2(uuid, text)
+            nhash = Cubes::putDatablob2(uuid, text)
             return "text:#{nhash}"
         end
         if referencetype == "url" then
             url = LucilleCore::askQuestionAnswerAsString("url: ")
-            nhash = Blades::putDatablob2(uuid, url)
+            nhash = Cubes::putDatablob2(uuid, url)
             return "url:#{nhash}"
         end
         if referencetype == "aion point" then
@@ -117,13 +117,13 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("text") then
             nhash = referenceString.split(":")[1]
-            text = Blades::getDatablobOrNull2(uuid, nhash)
+            text = Cub3sX::getDatablobOrNull2(uuid, nhash)
             puts "--------------------------------------------------------------"
             puts text
             puts "--------------------------------------------------------------"
             if LucilleCore::askQuestionAnswerAsBoolean("edit ? ") then
                 text = CommonUtils::editTextSynchronously(text)
-                nhash = Blades::putDatablob2(uuid, text)
+                nhash = Cubes::putDatablob2(uuid, text)
                 refstr = "text:#{nhash}"
                 BladesGI::setAttribute2(uuid, "field11", refstr)
             end
@@ -132,7 +132,7 @@ class CoreDataRefStrings
         end
         if referenceString.start_with?("url") then
             nhash = referenceString.split(":")[1]
-            url = Blades::getDatablobOrNull2(uuid, nhash)
+            url = Cub3sX::getDatablobOrNull2(uuid, nhash)
             if url.nil? then
                 puts "(error) I could not retrieve url for reference string: #{referenceString}"
                 LucilleCore::pressEnterToContinue()
