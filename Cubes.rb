@@ -119,6 +119,7 @@ class Cub3sX
 
     # Cub3sX::readFileAndUpdateItsMikuTypeCachedData1(filepath)
     def self.readFileAndUpdateItsMikuTypeCachedData1(filepath)
+        return if !File.exist?(filepath)
         mikuType = Cub3sX::getMandatoryAttribute1(filepath, "mikuType")
         data = XCache::getOrNull("cubes:mikutype->data:-b33d-d50e1762cd8e:#{mikuType}")
         if data then
