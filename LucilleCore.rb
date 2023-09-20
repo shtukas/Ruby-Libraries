@@ -313,14 +313,14 @@ class LucilleCore
         unselected.each{|item|
             counter = counter + 1
             counterToItemMapping[counter] = item
-            puts "      #{counter}: #{toStringLambda.call(item)}"
+            puts "      #{counter.to_s.rjust(2)}: #{toStringLambda.call(item)}"
         }
 
         puts "selected:"
         selected.each{|item|
             counter = counter + 1
             counterToItemMapping[counter] = item
-            puts "      #{counter}: #{toStringLambda.call(item)}"
+            puts "      #{counter.to_s.rjust(2)}: #{toStringLambda.call(item)}"
         }
 
         puts ""

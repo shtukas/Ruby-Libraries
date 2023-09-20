@@ -558,8 +558,11 @@ class CUtils3X
         
         filepaths
             .each{|filepath|
+                XCache::set("liveness:0340e024-58b3-4eb7", Time.new.to_i)
+                next if XCache::getFlag("31ac9cc4-6ec1-4b1f-91ba-70ad71880d55:#{filepath}")
                 puts filepath if verbose
                 Cub3sX::readFileAndUpdateCachedData1(filepath)
+                XCache::setFlag("31ac9cc4-6ec1-4b1f-91ba-70ad71880d55:#{filepath}", true)
             }
     end
 
