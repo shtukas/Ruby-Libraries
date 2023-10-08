@@ -166,50 +166,27 @@ class LucilleCore
 
     # LucilleCore::indexsubfolderpath(folderpath1, capacity = 100)
     def self.indexsubfolderpath(folderpath1, capacity = 100)
-        if !File.exist?(folderpath1) then
-            FileUtils.mkpath(folderpath1)
-        end
-        indexToLocation = lambda{|i, folderpath1| 
-            "#{folderpath1}/#{i.to_s.rjust(6,"0")}"
-        }
-        indx = LucilleCore::integerEnumerator()
-            .lazy
-            .drop_while{|i|  
-                File.exist?(indexToLocation.call(i, folderpath1)) and File.exist?(indexToLocation.call(i+1, folderpath1))
-            }
-            .drop_while{|i|  
-                folderpath = indexToLocation.call(i, folderpath1)
-                File.exist?(folderpath) and Dir.entries(folderpath).size >= capacity
-            }
-            .first
-        targetsubfolderpath = indexToLocation.call(indx, folderpath1)
-        if !File.exist?(targetsubfolderpath) then
-            FileUtils.mkpath(targetsubfolderpath)
-        end
-        targetsubfolderpath
-    end
+        folderpaths2 = LucilleCore::locationsAtFolder(folderpath1)
+                        .select{|location1| File.basename(location1).size == 6 }
+                        .sort
 
-    # LucilleCore::indexsubfolderpath2(folderpath1, capacity = 100)
-    # In this version, we target the first folder under capacity
-    def self.indexsubfolderpath2(folderpath1, capacity = 100)
-        if !File.exist?(folderpath1) then
-            FileUtils.mkpath(folderpath1)
+        if folderpaths2.size == 0 then
+            folderpath3 = "#{folderpath1}/000000"
+            FileUtils.mkdir(folderpath3)
+            return folderpath3
         end
-        indexToLocation = lambda{|i, folderpath1| 
-            "#{folderpath1}/#{i.to_s.rjust(6,"0")}"
-        }
-        indx = LucilleCore::integerEnumerator()
-            .lazy
-            .drop_while{|i|  
-                folderpath = indexToLocation.call(i, folderpath1)
-                File.exist?(folderpath) and Dir.entries(folderpath).size >= capacity
-            }
-            .first
-        targetsubfolderpath = indexToLocation.call(indx, folderpath1)
-        if !File.exist?(targetsubfolderpath) then
-            FileUtils.mkpath(targetsubfolderpath)
+
+        folderpath4 = folderpaths2.last
+
+        if Dir.entries(folderpath4).size < capacity then
+            return folderpath4
         end
-        targetsubfolderpath
+
+        indx = File.basename(folderpath4).to_i
+        indx = indx + 1
+        folderpath5 = "#{folderpath1}/#{indx.to_s.rjust(6,"0")}"
+        FileUtils.mkdir(folderpath5)
+        folderpath5
     end
 
     # LucilleCore::locationTraceRecursively(location)
